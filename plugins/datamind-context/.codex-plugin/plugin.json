@@ -1,0 +1,43 @@
+{
+  "name": "datamind-context",
+  "version": "1.0.0",
+  "description": "Official Codex adapter for the DataMind v1 runtime.",
+  "author": {
+    "name": "DataMind contributors",
+    "url": "https://github.com/OpenDCAI/DataMind"
+  },
+  "homepage": "https://github.com/OpenDCAI/DataMind",
+  "repository": "https://github.com/OpenDCAI/DataMind",
+  "license": "Apache-2.0",
+  "keywords": [
+    "rag",
+    "graphrag",
+    "knowledge-base",
+    "memory",
+    "codex"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "DataMind Context",
+    "shortDescription": "Use DataMind RAG, GraphRAG, StoreAgent and RetrieveAgent from Codex",
+    "longDescription": "Connect Codex to the DataMind runtime. The plugin is an adapter only: DataMind owns profiles, storage, RAG, GraphRAG, Memory and agent execution.",
+    "developerName": "DataMind contributors",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://opendcai.github.io/DataMind-Doc/",
+    "defaultPrompt": [
+      "用 DataMind 使用这个文件夹：",
+      "用 DataMind 问：",
+      "用 DataMind 更新这个文件夹："
+    ],
+    "brandColor": "#2563EB",
+    "composerIcon": "./assets/datamind-context.svg",
+    "logo": "./assets/datamind-context.svg",
+    "screenshots": []
+  }
+}

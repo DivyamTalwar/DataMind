@@ -6,6 +6,13 @@ All notable changes to DataMind are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Official Codex adapter under `plugins/datamind-context`, using the current
+  DataMind v1 runtime without a bundled duplicate runtime.
+- Repository-level `scripts/install_codex_plugin.sh` installer and README
+  guidance explaining when to use DataMind directly versus the Codex plugin.
+
 ### Planned
 
 - HTTP sink adapters for chunk, vector, and graph ingestion.

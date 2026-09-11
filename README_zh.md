@@ -14,8 +14,8 @@
 
 <p align="center">
   <a href="#快速开始">快速开始</a> ·
-  <a href="./GETTING_STARTED.md">完整上手</a> ·
-  <a href="./docs/STABLE_API.md">API</a> ·
+  <a href="https://opendcai.github.io/DataMind-Doc/">完整文档</a> ·
+  <a href="./plugins/datamind-context/">Codex Plugin</a> ·
   <a href="./README.md">English</a>
 </p>
 
@@ -93,6 +93,39 @@
 
 默认实现分别是 Chroma + BM25、SQLAlchemy（SQLite / MySQL / PostgreSQL）、NetworkX、profile 级 `SKILL.md` 和 SQLite Memory。
 
+## 选择 DataMind 的使用方式
+
+### 1. Codex Plugin —— 本地单人工作流
+
+官方 Codex 适配位于 [`plugins/datamind-context`](./plugins/datamind-context/)。
+它是一个薄 MCP 适配层，把 DataMind 的 RetrieveAgent、StoreAgent、RAG、
+GraphRAG 和 Memory 能力提供给 Codex，并和 DataMind 共用 profile、配置及
+存储。插件不包含第二套 DataMind runtime。
+
+~~~bash
+./scripts/install_codex_plugin.sh
+~~~
+
+这是使用个人文件和本地 Codex session 的最短路径。
+
+### 2. DataMind Service —— 并发、多 session 部署
+
+当多个 session 或用户需要共享 data plane 时，运行 FastAPI 服务，或者把
+DataMind 放到带鉴权的服务层后面。每个请求携带自己的 session 和 profile
+上下文；多进程部署应选择可共享的数据库和存储后端。
+
+~~~bash
+python -m uvicorn datamind.server:app --host 0.0.0.0 --port 8000
+~~~
+
+本地 SQLite profile 适合作为单人基线。公网或团队部署还需要认证、授权、
+TLS、限流和合适的共享后端，详见 [DataMind 文档站](https://opendcai.github.io/DataMind-Doc/)。
+
+### 3. Python、CLI 与 HTTP API
+
+需要把 DataMind 嵌入其他应用，或者直接从 Python、CLI、HTTP 调用时，使用
+`pip install datamind`。
+
 ## 快速开始
 
 ~~~bash
@@ -151,7 +184,7 @@ DATAMIND__DATA__PROFILE=enterprise_demo \
   python -m uvicorn datamind.server:app --port 8000
 ~~~
 
-把 `.md`、`.csv` 或 `.txt` 拖进去，提问并观察工具调用。完整流程见 [GETTING_STARTED.md](./GETTING_STARTED.md)。
+把 `.md`、`.csv` 或 `.txt` 拖进去，提问并观察工具调用。完整流程请查看 [DataMind 文档站](https://opendcai.github.io/DataMind-Doc/)。
 
 ## 对话本身就能改变 data plane
 
@@ -182,7 +215,7 @@ DATAMIND__AGENT__BACKEND=native
 DATAMIND__LLM__PROTOCOL=anthropic
 ~~~
 
-完整边界见 [native / SDK 支持矩阵](./docs/SUPPORT_MATRIX.md)。SDK + OpenAI 格式路径使用 [CCR](https://github.com/musistudio/claude-code-router) 做本地协议桥接。
+完整边界见 [native / SDK 支持矩阵](https://opendcai.github.io/DataMind-Doc/)。SDK + OpenAI 格式路径使用 [CCR](https://github.com/musistudio/claude-code-router) 做本地协议桥接。
 
 ## Python 与 HTTP API
 
@@ -200,11 +233,11 @@ async def answer() -> str:
         await system.aclose()
 ~~~
 
-内置 FastAPI 服务提供 `GET /api/health`、`GET /api/tools`、`POST /api/ask`、`POST /api/store`、`POST /api/chat`（SSE）和 `POST /api/upload`。详见[稳定 API](./docs/STABLE_API.md)。
+内置 FastAPI 服务提供 `GET /api/health`、`GET /api/tools`、`POST /api/ask`、`POST /api/store`、`POST /api/chat`（SSE）和 `POST /api/upload`。详见[稳定 API](https://opendcai.github.io/DataMind-Doc/)。
 
 ## 安全地嵌入，不要裸奔到公网
 
-DataMind 期待你在边缘层提供认证与授权。公网部署前请阅读[安全边界](./docs/SECURITY_BOUNDARIES.md)：
+DataMind 期待你在边缘层提供认证与授权。公网部署前请阅读[安全边界](https://opendcai.github.io/DataMind-Doc/)：
 
 - 本地使用绑定 loopback；
 - 在边缘层加入认证、授权、TLS 和限流；
@@ -228,17 +261,17 @@ CI 会运行无网络测试和确定性的 SQLite demo。长跑评测、checkpoi
 
 **开始构建**
 
-- [完整上手](./GETTING_STARTED.md)
-- [稳定 API](./docs/STABLE_API.md)
-- [native / SDK 支持矩阵](./docs/SUPPORT_MATRIX.md)
+- [完整上手](https://opendcai.github.io/DataMind-Doc/)
+- [稳定 API](https://opendcai.github.io/DataMind-Doc/)
+- [native / SDK 支持矩阵](https://opendcai.github.io/DataMind-Doc/)
 
 </td>
 <td valign="top" width="50%">
 
 **理解概念**
 
-- [术语与概念](./docs/CONCEPTS.md)
-- [公网部署安全边界](./docs/SECURITY_BOUNDARIES.md)
+- [术语与概念](https://opendcai.github.io/DataMind-Doc/)
+- [公网部署安全边界](https://opendcai.github.io/DataMind-Doc/)
 - [CHANGELOG](./CHANGELOG.md)
 
 </td>

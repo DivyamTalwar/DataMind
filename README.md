@@ -14,8 +14,8 @@
 
 <p align="center">
   <a href="#quick-start">Quick start</a> ·
-  <a href="./GETTING_STARTED.md">Tutorial</a> ·
-  <a href="./docs/STABLE_API.md">API</a> ·
+  <a href="https://opendcai.github.io/DataMind-Doc/">Documentation</a> ·
+  <a href="./plugins/datamind-context/">Codex plugin</a> ·
   <a href="./README_zh.md">中文</a>
 </p>
 
@@ -98,6 +98,42 @@ through `PathAllowlistHook`, `DestructiveSqlHook`, and `AuditLogHook`.
 Default providers are Chroma + BM25, SQLAlchemy (SQLite / MySQL / PostgreSQL),
 NetworkX, profile-scoped `SKILL.md`, and SQLite memory.
 
+## Choose a way to use DataMind
+
+### 1. Codex plugin — local, single-user workflow
+
+The official Codex integration lives in [`plugins/datamind-context`](./plugins/datamind-context/).
+It is a thin MCP adapter: it exposes DataMind's RetrieveAgent, StoreAgent,
+RAG, GraphRAG and Memory capabilities to Codex and shares the same profile,
+configuration and storage model. It does not ship a second DataMind runtime.
+
+~~~bash
+./scripts/install_codex_plugin.sh
+~~~
+
+This is the shortest path to using DataMind with personal files and a local
+Codex session.
+
+### 2. DataMind service — concurrent, multi-session deployment
+
+Run the FastAPI server or place DataMind behind an authenticated service layer
+when several sessions or users need to share a data plane. Requests carry their
+own session and profile context; choose a shared database and storage backend
+for a multi-process deployment.
+
+~~~bash
+python -m uvicorn datamind.server:app --host 0.0.0.0 --port 8000
+~~~
+
+The local SQLite profile is a convenient single-user baseline. Public or team
+deployments need authentication, authorization, TLS, rate limits and an
+appropriate shared backend; see the [DataMind documentation site](https://opendcai.github.io/DataMind-Doc/).
+
+### 3. Python, CLI and HTTP APIs
+
+Use `pip install datamind` when DataMind is embedded in another application or
+when you want to call the runtime directly from Python, the CLI or HTTP.
+
 ## Quick start
 
 ~~~bash
@@ -159,7 +195,7 @@ DATAMIND__DATA__PROFILE=enterprise_demo \
 ~~~
 
 Drop in `.md`, `.csv`, or `.txt`, ask a question, and watch the role-scoped
-tools work. The full walkthrough is in [GETTING_STARTED.md](./GETTING_STARTED.md).
+tools work. The full walkthrough is in the [DataMind documentation site](https://opendcai.github.io/DataMind-Doc/).
 
 ## Data can change during the conversation
 
@@ -191,7 +227,7 @@ DATAMIND__AGENT__BACKEND=native
 DATAMIND__LLM__PROTOCOL=anthropic
 ~~~
 
-Read the complete [native / SDK support matrix](./docs/SUPPORT_MATRIX.md). For
+Read the complete [native / SDK support matrix](https://opendcai.github.io/DataMind-Doc/). For
 SDK + OpenAI-compatible gateways, [CCR](https://github.com/musistudio/claude-code-router)
 is the local Anthropic ↔ OpenAI protocol bridge.
 
@@ -213,7 +249,7 @@ async def answer() -> str:
 
 The bundled FastAPI server exposes `GET /api/health`, `GET /api/tools`,
 `POST /api/ask`, `POST /api/store`, `POST /api/chat` (SSE), and
-`POST /api/upload`. See the [stable API contract](./docs/STABLE_API.md).
+`POST /api/upload`. See the [stable API contract](https://opendcai.github.io/DataMind-Doc/).
 
 ## Safe to embed, not safe to expose naked
 
@@ -225,7 +261,7 @@ deploying publicly:
 - isolate profile/storage directories and upload paths;
 - treat evidence provenance as metadata, never as a permission grant.
 
-See [public deployment security boundaries](./docs/SECURITY_BOUNDARIES.md).
+See [public deployment security boundaries](https://opendcai.github.io/DataMind-Doc/).
 
 ## Verify locally
 
@@ -246,17 +282,17 @@ demo. Benchmark and checkpoint/resume details live in
 
 **Build with it**
 
-- [Getting started](./GETTING_STARTED.md)
-- [Stable API](./docs/STABLE_API.md)
-- [Native / SDK matrix](./docs/SUPPORT_MATRIX.md)
+- [Getting started](https://opendcai.github.io/DataMind-Doc/)
+- [Stable API](https://opendcai.github.io/DataMind-Doc/)
+- [Native / SDK matrix](https://opendcai.github.io/DataMind-Doc/)
 
 </td>
 <td valign="top" width="50%">
 
 **Understand it**
 
-- [Concepts and terminology](./docs/CONCEPTS.md)
-- [Security boundaries](./docs/SECURITY_BOUNDARIES.md)
+- [Concepts and terminology](https://opendcai.github.io/DataMind-Doc/)
+- [Security boundaries](https://opendcai.github.io/DataMind-Doc/)
 - [CHANGELOG](./CHANGELOG.md)
 
 </td>

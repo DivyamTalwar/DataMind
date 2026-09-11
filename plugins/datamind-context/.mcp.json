@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "datamind-context": {
+      "command": "./src/run_datamind_mcp.sh",
+      "args": [
+      ],
+      "cwd": "."
+    }
+  }
+}
