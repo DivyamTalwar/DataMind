@@ -491,7 +491,10 @@ def build_model_client(cfg: LLMConfig, *, protocol: str | None = None):
         raw = AsyncAnthropic(
             base_url=str(cfg.api_base),
             api_key=cfg.api_key.get_secret_value(),
-            timeout=httpx.Timeout(cfg.timeout_s, connect=cfg.connect_timeout_s),
+            # Anthropic's SDK may use its bundled httpx2 types. Passing a
+            # timeout value instead of a timeout object keeps this boundary
+            # compatible across SDK/httpx releases.
+            timeout=cfg.timeout_s,
             max_retries=cfg.max_retries,
         )
         return AnthropicModelClient(raw, default_model=cfg.model)
