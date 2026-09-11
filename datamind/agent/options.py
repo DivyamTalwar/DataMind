@@ -368,6 +368,7 @@ async def build_datamind(
 
     catalogue = ToolRegistry()
     ingest_tools = build_ingest_tools(ingest) if ingest is not None else []
+    catalogue.extend([t for t in ingest_tools if t.surface is None])
     if "kb" in active:
         assert kb is not None
         catalogue.extend(build_kb_tools(kb))

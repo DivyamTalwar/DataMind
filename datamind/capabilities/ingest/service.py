@@ -22,6 +22,7 @@ Design notes:
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import json
 import re
@@ -44,6 +45,26 @@ from datamind.core.logging import get_logger
 from datamind.core.protocols import GraphTriple, TextModelClient
 
 _log = get_logger("ingest")
+
+_WORKSPACE_SURFACE_EXTS: dict[str, tuple[str, ...]] = {
+    ".txt": ("kb", "graph_text"),
+    ".md": ("kb", "graph_text"),
+    ".markdown": ("kb", "graph_text"),
+    ".html": ("kb", "graph_text"),
+    ".json": ("kb", "graph_text"),
+    ".xml": ("kb", "graph_text"),
+    ".py": ("kb", "graph_text"),
+    ".java": ("kb", "graph_text"),
+    ".csv": ("db", "kb", "graph_schema"),
+    ".tsv": ("db", "kb", "graph_schema"),
+    ".xls": ("db", "kb", "graph_schema"),
+    ".xlsx": ("db", "kb", "graph_schema"),
+    ".pdf": ("kb", "graph_text"),
+    ".doc": ("kb", "graph_text"),
+    ".docx": ("kb", "graph_text"),
+    ".ppt": ("kb", "graph_text"),
+    ".pptx": ("kb", "graph_text"),
+}
 
 
 # ============================================================ path safety
@@ -155,6 +176,83 @@ class IngestService:
 
         # Re-run resolve on the original to surface the original error.
         return _resolve_safe_path(raw_path, self._allowed_roots)
+
+    async def workspace_inspect(
+        self,
+        *,
+        path: str,
+        recursive: bool = True,
+        include_hash: bool = True,
+        max_files: int = 2000,
+    ) -> dict[str, Any]:
+        """Inventory a workspace before choosing a surface to build.
+
+        The result is intentionally read-only and provider-neutral. It does
+        not parse or ingest files; it gives a Builder stable file metadata,
+        content hashes, and conservative surface candidates for planning.
+        """
+        if not path or not path.strip():
+            raise CapabilityError("ingest", "path is required")
+        if not 1 <= max_files <= 10000:
+            raise CapabilityError("ingest", "max_files must be between 1 and 10000")
+
+        resolved = _resolve_safe_path(path, self._allowed_roots)
+        if resolved.is_file():
+            candidates = [resolved]
+        elif resolved.is_dir():
+            iterator = resolved.rglob("*") if recursive else resolved.glob("*")
+            candidates = sorted(item for item in iterator if item.is_file())
+        else:
+            raise CapabilityError("ingest", f"path does not exist: {resolved}")
+
+        files_found = len(candidates)
+        truncated = files_found > max_files
+        candidates = candidates[:max_files]
+        files: list[dict[str, Any]] = []
+        by_extension: dict[str, int] = {}
+        by_surface: dict[str, int] = {}
+        for candidate in candidates:
+            suffix = candidate.suffix.lower() or "<none>"
+            try:
+                size = candidate.stat().st_size
+                digest = None
+                if include_hash:
+                    hasher = hashlib.sha256()
+                    with candidate.open("rb") as handle:
+                        for block in iter(lambda: handle.read(1024 * 1024), b""):
+                            hasher.update(block)
+                    digest = f"sha256:{hasher.hexdigest()}"
+            except OSError as exc:
+                files.append({
+                    "path": str(candidate), "extension": suffix,
+                    "status": "unreadable", "error": str(exc),
+                })
+                continue
+            surfaces = list(_WORKSPACE_SURFACE_EXTS.get(suffix, ()))
+            files.append({
+                "path": str(candidate),
+                "relative_path": str(candidate.relative_to(resolved)) if resolved.is_dir() else candidate.name,
+                "extension": suffix,
+                "bytes": size,
+                "sha256": digest,
+                "candidate_surfaces": surfaces,
+                "status": "supported" if surfaces else "unclassified",
+            })
+            by_extension[suffix] = by_extension.get(suffix, 0) + 1
+            for surface in surfaces:
+                by_surface[surface] = by_surface.get(surface, 0) + 1
+
+        return {
+            "path": str(resolved),
+            "recursive": recursive,
+            "files_scanned": len(files),
+            "files_total": files_found,
+            "truncated": truncated,
+            "max_files": max_files,
+            "by_extension": dict(sorted(by_extension.items())),
+            "by_surface": dict(sorted(by_surface.items())),
+            "files": files,
+        }
 
     # ------------------------------------------------------------- KB
 

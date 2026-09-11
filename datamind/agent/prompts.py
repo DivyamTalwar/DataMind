@@ -77,6 +77,7 @@ _GROUP_LABEL = {
     "skill.code": "通用小工具",
     "skill.store": "技能写入 (skill_upsert)",
     "ingest": "数据导入 (kb_add_* / db_import_* / graph_add_*)",
+    "workspace": "Workspace 构建准备 (workspace_*)",
     "other": "其他",
 }
 
@@ -85,7 +86,7 @@ def _tool_group_lines(specs: Iterable[ToolSpec]) -> str:
     grouped = _group(specs)
     lines: list[str] = []
     for label in [
-        "kb", "graph", "db", "skill.knowledge", "skill.code", "skill.store", "memory", "ingest"
+        "kb", "graph", "db", "workspace", "skill.knowledge", "skill.code", "skill.store", "memory", "ingest"
     ]:
         if label not in grouped:
             continue
@@ -94,7 +95,7 @@ def _tool_group_lines(specs: Iterable[ToolSpec]) -> str:
         lines.append(f"- {friendly}: {names}")
     for label, specs_list in grouped.items():
         if label in {
-            "kb", "graph", "db", "skill.knowledge", "skill.code", "skill.store", "memory", "ingest"
+            "kb", "graph", "db", "workspace", "skill.knowledge", "skill.code", "skill.store", "memory", "ingest"
         }:
             continue
         names = ", ".join(s.name for s in specs_list)

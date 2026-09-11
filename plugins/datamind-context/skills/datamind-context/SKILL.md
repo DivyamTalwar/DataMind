@@ -11,6 +11,7 @@ or inspect profiles.
 
 Prefer these tools:
 
+- `datamind_workspace_inspect` before building surfaces from a workspace.
 - `datamind_use_folder` to add a file or directory.
 - `datamind_graph_ingest` to build only the graph from text files, or pass
   `build_graph=true` to `datamind_use_folder` to build KB and Graph together.

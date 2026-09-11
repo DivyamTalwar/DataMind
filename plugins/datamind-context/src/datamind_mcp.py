@@ -31,6 +31,13 @@ SERVER_VERSION = "1.0.0"
 PROTOCOL_VERSION = "2025-06-18"
 
 TOOLS: dict[str, dict[str, Any]] = {
+    "datamind_workspace_inspect": {
+        "description": "Read-only inventory of a file or workspace directory before building DataMind surfaces.",
+        "inputSchema": {"type": "object", "required": ["path"], "properties": {
+            "path": {"type": "string"}, "profile": {"type": "string", "default": "default"},
+            "recursive": {"type": "boolean", "default": True},
+            "include_hash": {"type": "boolean", "default": True},
+            "max_files": {"type": "integer", "minimum": 1, "maximum": 10000, "default": 2000}}}},
     "datamind_ask": {
         "description": "Ask DataMind RetrieveAgent to answer from the active profile.",
         "inputSchema": {"type": "object", "required": ["question"], "properties": {
@@ -91,6 +98,14 @@ async def execute(name: str, args: dict[str, Any]) -> dict[str, Any]:
     )
     try:
         with bind_context(context):
+            if name == "datamind_workspace_inspect":
+                spec = system.retrieve.tools.get("workspace_inspect")
+                return await spec.handler(
+                    path=str(args["path"]),
+                    recursive=bool(args.get("recursive", True)),
+                    include_hash=bool(args.get("include_hash", True)),
+                    max_files=int(args.get("max_files", 2000)),
+                )
             if name == "datamind_ask":
                 return await system.query(str(args["question"]))
             if name == "datamind_store":

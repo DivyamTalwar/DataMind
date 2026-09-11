@@ -27,6 +27,56 @@ class _Graph:
         self.store = _Store()
 
 
+def _service(tmp_path: Path) -> IngestService:
+    return IngestService(
+        kb=None,
+        db=None,
+        graph=_Graph(),
+        llm_client=_Model(),
+        llm_model="test",
+        profile_data_dir=tmp_path / "profile",
+        chunk_size=512,
+        chunk_overlap=64,
+    )
+
+
+@pytest.mark.asyncio
+async def test_workspace_inspect_reports_hashes_and_surface_candidates(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / "notes.md").write_text("hello", encoding="utf-8")
+    (workspace / "orders.xlsx").write_bytes(b"fixture")
+    (workspace / "image.png").write_bytes(b"fixture")
+
+    result = await _service(tmp_path).workspace_inspect(path=str(workspace))
+
+    assert result["files_scanned"] == 3
+    assert result["by_extension"] == {".md": 1, ".png": 1, ".xlsx": 1}
+    assert result["by_surface"]["kb"] == 2
+    assert result["by_surface"]["db"] == 1
+    notes = next(item for item in result["files"] if item["path"].endswith("notes.md"))
+    assert notes["relative_path"] == "notes.md"
+    assert notes["sha256"].startswith("sha256:")
+    assert notes["candidate_surfaces"] == ["kb", "graph_text"]
+
+
+@pytest.mark.asyncio
+async def test_workspace_inspect_caps_file_listing(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    for name in ("a.md", "b.md", "c.md"):
+        (workspace / name).write_text(name, encoding="utf-8")
+
+    result = await _service(tmp_path).workspace_inspect(
+        path=str(workspace), include_hash=False, max_files=2
+    )
+
+    assert result["files_total"] == 3
+    assert result["files_scanned"] == 2
+    assert result["truncated"] is True
+    assert all(item["sha256"] is None for item in result["files"])
+
+
 @pytest.mark.asyncio
 async def test_graph_add_path_extracts_each_text_file_with_source(tmp_path: Path):
     source_dir = tmp_path / "docs"

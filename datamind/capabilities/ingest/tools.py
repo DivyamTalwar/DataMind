@@ -30,6 +30,19 @@ def build_ingest_tools(svc: IngestService) -> list[ToolSpec]:
     ) -> dict:
         return await svc.kb_add_text(text=text, source=source, persist=persist)
 
+    async def _workspace_inspect(
+        path: str,
+        recursive: bool = True,
+        include_hash: bool = True,
+        max_files: int = 2000,
+    ) -> dict:
+        return await svc.workspace_inspect(
+            path=path,
+            recursive=recursive,
+            include_hash=include_hash,
+            max_files=max_files,
+        )
+
     async def _kb_add_file(path: str, copy_to_profile: bool = True) -> dict:
         return await svc.kb_add_file(path=path, copy_to_profile=copy_to_profile)
 
@@ -73,6 +86,26 @@ def build_ingest_tools(svc: IngestService) -> list[ToolSpec]:
         )
 
     return [
+        ToolSpec(
+            name="workspace_inspect",
+            description=(
+                "Read-only inventory of a file or workspace directory. Returns file types, "
+                "sizes, SHA-256 hashes, and conservative candidate surfaces (RAG, table, "
+                "or graph) without ingesting anything. Use this before planning a build."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Workspace file or directory."},
+                    "recursive": {"type": "boolean", "default": True},
+                    "include_hash": {"type": "boolean", "default": True},
+                    "max_files": {"type": "integer", "minimum": 1, "maximum": 10000, "default": 2000},
+                },
+                "required": ["path"],
+            },
+            handler=_workspace_inspect,
+            metadata={"group": "workspace", "access": "utility"},
+        ),
         ToolSpec(
             name="kb_add_text",
             description=(
