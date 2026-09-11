@@ -50,6 +50,18 @@ def build_ingest_tools(svc: IngestService) -> list[ToolSpec]:
             path=path, recursive=recursive, max_files=max_files
         )
 
+    async def _build_start(path: str) -> dict:
+        return await svc.build_start(path=path)
+
+    async def _build_freeze(build_id: str) -> dict:
+        return await svc.build_freeze(build_id=build_id)
+
+    async def _build_verify(build_id: str) -> dict:
+        return await svc.build_verify(build_id=build_id)
+
+    async def _build_export(build_id: str, output_path: str) -> dict:
+        return await svc.build_export(build_id=build_id, output_path=output_path)
+
     async def _kb_add_file(path: str, copy_to_profile: bool = True) -> dict:
         return await svc.kb_add_file(path=path, copy_to_profile=copy_to_profile)
 
@@ -122,6 +134,36 @@ def build_ingest_tools(svc: IngestService) -> list[ToolSpec]:
             },
             handler=_workspace_inspect,
             metadata={"group": "workspace", "access": "utility"},
+        ),
+        ToolSpec(
+            name="build_start",
+            description="Start a workspace build run and capture the source inventory before ingestion.",
+            input_schema={"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]},
+            handler=_build_start,
+            metadata={"group": "workspace", "access": "write"},
+        ),
+        ToolSpec(
+            name="build_freeze",
+            description="Freeze current DataMind artifacts for a build and record content hashes.",
+            input_schema={"type": "object", "properties": {"build_id": {"type": "string"}}, "required": ["build_id"]},
+            handler=_build_freeze,
+            metadata={"group": "workspace", "access": "write"},
+        ),
+        ToolSpec(
+            name="build_verify",
+            description="Verify that frozen DataMind artifacts still match their recorded hashes.",
+            input_schema={"type": "object", "properties": {"build_id": {"type": "string"}}, "required": ["build_id"]},
+            handler=_build_verify,
+            metadata={"group": "workspace", "access": "utility"},
+        ),
+        ToolSpec(
+            name="build_export",
+            description="Export a verified frozen build to a directory without copying raw source files.",
+            input_schema={"type": "object", "properties": {
+                "build_id": {"type": "string"}, "output_path": {"type": "string"}},
+                "required": ["build_id", "output_path"]},
+            handler=_build_export,
+            metadata={"group": "workspace", "access": "write"},
         ),
         ToolSpec(
             name="graph_build_lineage",

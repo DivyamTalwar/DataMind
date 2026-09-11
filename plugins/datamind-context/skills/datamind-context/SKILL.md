@@ -17,6 +17,7 @@ Prefer these tools:
   `build_graph=true` to `datamind_use_folder` to build KB and Graph together.
 - `datamind_graph_build_lineage` to build file dependencies and provenance from a workspace.
 - `datamind_table_ingest` to import CSV/TSV or Excel sheets as queryable tables.
+- Use `datamind_build_start`, then ingest/build surfaces, `datamind_build_freeze`, and `datamind_build_verify` before exporting a reusable build.
 - `datamind_ask` for an evidence-backed answer across DataMind surfaces.
 - `datamind_rag_query` for direct document search.
 - `datamind_graph_query` for relationship and multi-hop questions.

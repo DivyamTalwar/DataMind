@@ -66,6 +66,18 @@ TOOLS: dict[str, dict[str, Any]] = {
             "path": {"type": "string"}, "profile": {"type": "string", "default": "default"},
             "table_prefix": {"type": ["string", "null"]},
             "if_exists": {"type": "string", "enum": ["append", "replace", "fail"], "default": "append"}}}},
+    "datamind_build_start": {
+        "description": "Start a build run and capture the workspace source inventory.",
+        "inputSchema": {"type": "object", "required": ["path"], "properties": {"path": {"type": "string"}, "profile": {"type": "string", "default": "default"}}}},
+    "datamind_build_freeze": {
+        "description": "Freeze current DataMind artifacts and record content hashes.",
+        "inputSchema": {"type": "object", "required": ["build_id"], "properties": {"build_id": {"type": "string"}, "profile": {"type": "string", "default": "default"}}}},
+    "datamind_build_verify": {
+        "description": "Verify a frozen build's artifact hashes.",
+        "inputSchema": {"type": "object", "required": ["build_id"], "properties": {"build_id": {"type": "string"}, "profile": {"type": "string", "default": "default"}}}},
+    "datamind_build_export": {
+        "description": "Export a verified frozen build to a local directory.",
+        "inputSchema": {"type": "object", "required": ["build_id", "output_path"], "properties": {"build_id": {"type": "string"}, "output_path": {"type": "string"}, "profile": {"type": "string", "default": "default"}}}},
     "datamind_rag_query": {
         "description": "Search the active profile knowledge base with vector RAG.",
         "inputSchema": {"type": "object", "required": ["query"], "properties": {
@@ -138,6 +150,14 @@ async def execute(name: str, args: dict[str, Any]) -> dict[str, Any]:
             if name == "datamind_table_ingest":
                 spec = system.store.tools.get("db_import_path")
                 return await spec.handler(path=str(args["path"]), table_prefix=args.get("table_prefix"), if_exists=str(args.get("if_exists", "append")))
+            if name == "datamind_build_start":
+                return await system.store.tools.get("build_start").handler(path=str(args["path"]))
+            if name == "datamind_build_freeze":
+                return await system.store.tools.get("build_freeze").handler(build_id=str(args["build_id"]))
+            if name == "datamind_build_verify":
+                return await system.retrieve.tools.get("build_verify").handler(build_id=str(args["build_id"]))
+            if name == "datamind_build_export":
+                return await system.store.tools.get("build_export").handler(build_id=str(args["build_id"]), output_path=str(args["output_path"]))
             if name == "datamind_rag_query":
                 spec = system.retrieve.tools.get("kb_search")
                 return await spec.handler(query=str(args["query"]), top_k=int(args.get("top_k", 5)))

@@ -114,6 +114,34 @@ async def test_graph_build_lineage_adds_deterministic_file_relations(tmp_path: P
 
 
 @pytest.mark.asyncio
+async def test_build_lifecycle_freezes_verifies_and_exports_artifacts(tmp_path: Path):
+    base = tmp_path / "project"
+    profile = base / "data" / "profiles" / "default"
+    workspace = tmp_path / "workspace"
+    profile.mkdir(parents=True)
+    workspace.mkdir()
+    (workspace / "notes.md").write_text("build me", encoding="utf-8")
+    storage = base / "storage" / "default"
+    storage.mkdir(parents=True)
+    (storage / "graph.json").write_text("{}", encoding="utf-8")
+    service = IngestService(
+        kb=None, db=None, graph=_Graph(), llm_client=_Model(), llm_model="test",
+        profile_data_dir=profile, chunk_size=512, chunk_overlap=64,
+    )
+
+    started = await service.build_start(path=str(workspace))
+    frozen = await service.build_freeze(build_id=started["build_id"])
+    assert frozen["status"] == "FROZEN"
+    assert (profile / "builds" / started["build_id"] / "manifest.json").is_file()
+    assert (await service.build_verify(build_id=started["build_id"]))["ok"] is True
+
+    output = tmp_path / "export"
+    exported = await service.build_export(build_id=started["build_id"], output_path=str(output))
+    assert exported["artifacts_exported"] >= 1
+    assert (output / "storage" / "graph.json").read_text(encoding="utf-8") == "{}"
+
+
+@pytest.mark.asyncio
 async def test_graph_add_path_extracts_each_text_file_with_source(tmp_path: Path):
     source_dir = tmp_path / "docs"
     source_dir.mkdir()

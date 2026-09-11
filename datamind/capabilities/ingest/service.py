@@ -27,6 +27,8 @@ import io
 import json
 import re
 import shutil
+import time
+import uuid
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -412,6 +414,129 @@ class IngestService:
             "relations": dict(sorted({rel: sum(1 for t in triples if t.relation == rel) for rel in {t.relation for t in triples}}.items())),
             "truncated": inventory["truncated"],
         }
+
+    # ------------------------------------------------------------- Build lifecycle
+
+    @staticmethod
+    def _file_hash(path: Path) -> str:
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for block in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(block)
+        return f"sha256:{digest.hexdigest()}"
+
+    def _build_dir(self, build_id: str) -> Path:
+        return self._profile_dir / "builds" / build_id
+
+    def _profile_storage_dir(self) -> Path:
+        # profile_data_dir is <base>/data/profiles/<profile>; indexes live in
+        # the sibling <base>/storage/<profile> directory.
+        return self._profile_dir.parents[2] / "storage" / self._profile_dir.name
+
+    async def build_start(self, *, path: str) -> dict[str, Any]:
+        """Start a build run and record the immutable source inventory."""
+        resolved = _resolve_safe_path(path, self._allowed_roots)
+        inventory = await self.workspace_inspect(path=str(resolved), include_hash=True)
+        build_id = f"build-{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}"
+        run_dir = self._build_dir(build_id)
+        run_dir.mkdir(parents=True, exist_ok=False)
+        state = {
+            "build_id": build_id,
+            "status": "BUILDING",
+            "workspace": str(resolved),
+            "source_inventory": inventory,
+            "profile": self._profile_dir.name,
+            "created_at": time.time(),
+        }
+        (run_dir / "state.json").write_text(
+            json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        return {"build_id": build_id, "status": "BUILDING", "workspace": str(resolved)}
+
+    async def build_freeze(self, *, build_id: str) -> dict[str, Any]:
+        """Freeze current profile artifacts and record their content hashes."""
+        run_dir = self._build_dir(build_id)
+        state_path = run_dir / "state.json"
+        if not state_path.is_file():
+            raise CapabilityError("ingest", f"unknown build_id '{build_id}'")
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        if state.get("status") != "BUILDING":
+            raise CapabilityError("ingest", f"build is not BUILDING: {state.get('status')}")
+        roots = {"profile": self._profile_dir, "storage": self._profile_storage_dir()}
+        artifacts: dict[str, str] = {}
+        for label, root in roots.items():
+            if not root.is_dir():
+                continue
+            for candidate in sorted(root.rglob("*")):
+                if not candidate.is_file() or "builds" in candidate.parts:
+                    continue
+                artifacts[f"{label}/{candidate.relative_to(root)}"] = self._file_hash(candidate)
+        manifest = {
+            "build_id": build_id,
+            "workspace": state["workspace"],
+            "source_files": {
+                item["path"]: item.get("sha256")
+                for item in state["source_inventory"].get("files", [])
+                if item.get("sha256")
+            },
+            "artifacts": artifacts,
+            "frozen_at": time.time(),
+        }
+        canonical = json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        manifest["freeze_lock"] = f"sha256:{hashlib.sha256(canonical.encode('utf-8')).hexdigest()}"
+        (run_dir / "manifest.json").write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        state["status"] = "FROZEN"
+        state["freeze_lock"] = manifest["freeze_lock"]
+        state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+        return {"build_id": build_id, "status": "FROZEN", "artifacts": len(artifacts), "freeze_lock": manifest["freeze_lock"]}
+
+    async def build_verify(self, *, build_id: str) -> dict[str, Any]:
+        """Verify that a frozen build's DataMind artifacts have not changed."""
+        run_dir = self._build_dir(build_id)
+        manifest_path = run_dir / "manifest.json"
+        if not manifest_path.is_file():
+            raise CapabilityError("ingest", f"build '{build_id}' has not been frozen")
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        changed: list[str] = []
+        missing: list[str] = []
+        for key, expected in manifest.get("artifacts", {}).items():
+            label, relative = key.split("/", 1)
+            root = self._profile_dir if label == "profile" else self._profile_storage_dir()
+            candidate = root / relative
+            if not candidate.is_file():
+                missing.append(key)
+            elif self._file_hash(candidate) != expected:
+                changed.append(key)
+        return {
+            "build_id": build_id,
+            "ok": not changed and not missing,
+            "artifacts": len(manifest.get("artifacts", {})),
+            "changed": changed,
+            "missing": missing,
+            "freeze_lock": manifest.get("freeze_lock"),
+        }
+
+    async def build_export(self, *, build_id: str, output_path: str) -> dict[str, Any]:
+        """Export a verified frozen build without copying raw source files."""
+        verification = await self.build_verify(build_id=build_id)
+        if not verification["ok"]:
+            raise CapabilityError("ingest", "cannot export a modified or incomplete build")
+        target = _resolve_safe_path(output_path, self._allowed_roots)
+        target.mkdir(parents=True, exist_ok=True)
+        manifest = json.loads((self._build_dir(build_id) / "manifest.json").read_text(encoding="utf-8"))
+        copied = 0
+        for key in manifest.get("artifacts", {}):
+            label, relative = key.split("/", 1)
+            root = self._profile_dir if label == "profile" else self._profile_storage_dir()
+            source = root / relative
+            destination = target / label / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
+            copied += 1
+        shutil.copy2(self._build_dir(build_id) / "manifest.json", target / "manifest.json")
+        return {"build_id": build_id, "output_path": str(target), "artifacts_exported": copied}
 
     # ------------------------------------------------------------- KB
 
