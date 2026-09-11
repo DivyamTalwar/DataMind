@@ -91,7 +91,8 @@ through `PathAllowlistHook`, `DestructiveSqlHook`, and `AuditLogHook`.
 
 - **KB / RAG** — documents, notes, policies, semantic search
 - **Database** — exact numbers, filters, joins, aggregations
-- **Knowledge Graph** — entities, relationships, multi-hop facts
+- **Knowledge Graph** — entities, relationships, multi-hop facts; ingest
+  structured triples or extract bounded triples from text files and directories
 - **Skills** — reusable procedures and safe utilities
 - **Memory** — preferences and durable facts, scoped to `global`, `profile`, or `session`
 
@@ -113,6 +114,11 @@ configuration and storage model. It does not ship a second DataMind runtime.
 
 This is the shortest path to using DataMind with personal files and a local
 Codex session.
+
+`datamind_use_folder` indexes supported text files into the KB and builds the
+Graph by default. Use `datamind_graph_ingest` when you want graph-only ingest;
+each generated edge keeps its source path for provenance and replacement on
+re-ingest.
 
 ### 2. DataMind service — concurrent, multi-session deployment
 

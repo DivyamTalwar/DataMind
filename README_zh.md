@@ -87,7 +87,8 @@
 
 - **KB / RAG** —— 文档、制度、笔记与语义检索
 - **Database** —— 精确数字、筛选、Join 与聚合
-- **Knowledge Graph** —— 实体、关系与多跳事实
+- **Knowledge Graph** —— 实体、关系与多跳事实；支持结构化三元组导入，
+  也支持从文本文件或目录中有界抽取三元组
 - **Skills** —— 可复用流程与安全工具
 - **Memory** —— 偏好和长期事实，支持 `global`、`profile`、`session`
 
@@ -107,6 +108,10 @@ GraphRAG 和 Memory 能力提供给 Codex，并和 DataMind 共用 profile、配
 ~~~
 
 这是使用个人文件和本地 Codex session 的最短路径。
+
+`datamind_use_folder` 默认会把支持的文本文件写入 KB 并同步构建 Graph。
+如果只需要图谱入库，可以使用 `datamind_graph_ingest`；每条生成的边都会保留
+来源路径，重复入库时可按来源替换。
 
 ### 2. DataMind Service —— 并发、多 session 部署
 

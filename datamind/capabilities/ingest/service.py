@@ -7,6 +7,7 @@ Store tools:
     db_import_csv            CSV → infer schema → CREATE TABLE → INSERT
     db_import_records        records → infer schema → CREATE TABLE → INSERT
     graph_add_triples_from_text   free-form text → LLM extracts (s,r,o) → upsert
+    graph_add_path                 file/directory → bounded extraction → upsert
 
 Design notes:
 - Re-uses existing chunker/hasher from capabilities/kb/indexer so ingested
@@ -534,6 +535,7 @@ class IngestService:
         *,
         text: str,
         max_triples: int = 30,
+        source: str | None = None,
     ) -> dict[str, Any]:
         """Use the LLM to extract (subject, relation, object) triples from
         free-form text, then upsert them into the graph store.
@@ -546,6 +548,8 @@ class IngestService:
             raise CapabilityError("ingest", "Graph surface is disabled")
         if not text or not text.strip():
             raise CapabilityError("ingest", f"text is required")
+        if not 1 <= max_triples <= 200:
+            raise CapabilityError("ingest", "max_triples must be between 1 and 200")
 
         prompt = (
             "Extract knowledge graph triples from the user's text. "
@@ -567,8 +571,18 @@ class IngestService:
 
         triples = self._parse_triples_json(raw)
         if not triples:
+            if source:
+                reconcile = getattr(self._graph.store, "reconcile_source_triples", None)
+                if source and callable(reconcile):
+                    await reconcile(source, [])
+                    persist = getattr(self._graph.store, "persist", None)
+                    if callable(persist):
+                        result = persist()
+                        if hasattr(result, "__await__"):
+                            await result
             return {
                 "triples_added": 0,
+                "source": source,
                 "note": "model returned no parseable triples",
                 "raw_response": raw[:500],
             }
@@ -579,10 +593,18 @@ class IngestService:
                 subject=str(t["subject"]),
                 relation=str(t["relation"]),
                 object=str(t["object"]),
+                source=source,
             )
-            for t in triples
+            for t in triples[:max_triples]
         ]
-        await self._graph.store.upsert_triples(gt)
+        properties = {"_source_managed": True, "_source_path": source} if source else {}
+        if properties:
+            gt = [t.model_copy(update={"properties": properties}) for t in gt]
+        reconcile = getattr(self._graph.store, "reconcile_source_triples", None)
+        if source and callable(reconcile):
+            await reconcile(source, gt)
+        else:
+            await self._graph.store.upsert_triples(gt)
 
         # Persist to disk so the new edges survive restart. NetworkX
         # store's persist is sync; other stores may make it a coroutine.
@@ -596,10 +618,76 @@ class IngestService:
         _log.info("graph_add_triples_from_text", extra={"count": len(gt)})
         return {
             "triples_added": len(gt),
+            "source": source,
             "samples": [
                 {"subject": t.subject, "relation": t.relation, "object": t.object}
                 for t in gt[:8]
             ],
+        }
+
+    async def graph_add_path(
+        self,
+        *,
+        path: str,
+        recursive: bool = True,
+        max_triples_per_file: int = 30,
+    ) -> dict[str, Any]:
+        """Extract and persist graph triples from one text file or directory.
+
+        This is deliberately a bounded batch wrapper around
+        ``graph_add_triples_from_text``. It keeps source paths on every edge so
+        later retrieval can explain where a relationship came from.
+        """
+        if self._graph is None:
+            raise CapabilityError("ingest", "Graph surface is disabled")
+        if not path or not path.strip():
+            raise CapabilityError("ingest", "path is required")
+        if not 1 <= max_triples_per_file <= 200:
+            raise CapabilityError("ingest", "max_triples_per_file must be between 1 and 200")
+
+        resolved = _resolve_safe_path(path, self._allowed_roots)
+        if resolved.is_file():
+            if resolved.suffix.lower() not in _TEXT_EXTS:
+                raise CapabilityError(
+                    "ingest",
+                    f"unsupported extension '{resolved.suffix}'. Supported: {sorted(_TEXT_EXTS)}",
+                )
+            candidates = [resolved]
+        elif resolved.is_dir():
+            iterator = resolved.rglob("*") if recursive else resolved.glob("*")
+            candidates = sorted(
+                item for item in iterator
+                if item.is_file() and item.suffix.lower() in _TEXT_EXTS
+            )
+        else:
+            raise CapabilityError("ingest", f"path does not exist: {resolved}")
+
+        processed: list[dict[str, Any]] = []
+        skipped: list[str] = []
+        total = 0
+        for candidate in candidates:
+            try:
+                content = candidate.read_text(encoding="utf-8", errors="replace")
+                if not content.strip():
+                    skipped.append(f"{candidate}: empty")
+                    continue
+                result = await self.graph_add_triples_from_text(
+                    text=content,
+                    max_triples=max_triples_per_file,
+                    source=str(candidate),
+                )
+                processed.append({"path": str(candidate), **result})
+                total += int(result.get("triples_added", 0))
+            except (OSError, UnicodeError, CapabilityError) as exc:
+                skipped.append(f"{candidate}: {exc}")
+
+        return {
+            "path": str(resolved),
+            "files_processed": len(processed),
+            "triples_added": total,
+            "files": processed,
+            "skipped": skipped[:20],
+            "skipped_count": len(skipped),
         }
 
     @staticmethod

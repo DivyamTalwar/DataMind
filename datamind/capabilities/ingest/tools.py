@@ -61,6 +61,17 @@ def build_ingest_tools(svc: IngestService) -> list[ToolSpec]:
     async def _graph_add_triples_from_text(text: str, max_triples: int = 30) -> dict:
         return await svc.graph_add_triples_from_text(text=text, max_triples=max_triples)
 
+    async def _graph_add_path(
+        path: str,
+        recursive: bool = True,
+        max_triples_per_file: int = 30,
+    ) -> dict:
+        return await svc.graph_add_path(
+            path=path,
+            recursive=recursive,
+            max_triples_per_file=max_triples_per_file,
+        )
+
     return [
         ToolSpec(
             name="kb_add_text",
@@ -233,6 +244,28 @@ def build_ingest_tools(svc: IngestService) -> list[ToolSpec]:
                 "required": ["text"],
             },
             handler=_graph_add_triples_from_text,
+            metadata={"group": "ingest", "surface": "graph", "access": "write"},
+        ),
+        ToolSpec(
+            name="graph_add_path",
+            description=(
+                "Read one text file or every supported text file under a directory, "
+                "extract bounded knowledge-graph triples with the LLM, and persist "
+                "them with the source path attached for provenance. Use this for "
+                "folder-level graph ingest; use graph_upsert_triples for structured data."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Text file or directory to ingest."},
+                    "recursive": {"type": "boolean", "default": True},
+                    "max_triples_per_file": {
+                        "type": "integer", "minimum": 1, "maximum": 200, "default": 30,
+                    },
+                },
+                "required": ["path"],
+            },
+            handler=_graph_add_path,
             metadata={"group": "ingest", "surface": "graph", "access": "write"},
         ),
     ]

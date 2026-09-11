@@ -12,6 +12,9 @@ All notable changes to DataMind are documented here. The format follows
   DataMind v1 runtime without a bundled duplicate runtime.
 - Repository-level `scripts/install_codex_plugin.sh` installer and README
   guidance explaining when to use DataMind directly versus the Codex plugin.
+- Bounded Graph ingest for text files and directories, with source provenance
+  and source-scoped replacement on re-ingest; the Codex adapter exposes it as
+  `datamind_graph_ingest` and enables it from `datamind_use_folder` by default.
 
 ### Planned
 

@@ -158,6 +158,19 @@ class NetworkXGraphStore:
         # Drop now-orphaned profile nodes without touching runtime nodes.
         self._g.remove_nodes_from(list(nx.isolates(self._g)))
 
+    async def reconcile_source_triples(
+        self, source: str, triples: Sequence[GraphTriple]
+    ) -> None:
+        """Replace edges produced from one source file while preserving others."""
+        stale = [
+            (u, v, key)
+            for u, v, key, data in self._g.edges(keys=True, data=True)
+            if data.get("p__source_path") == source
+        ]
+        self._g.remove_edges_from(stale)
+        await self.upsert_triples(triples)
+        self._g.remove_nodes_from(list(nx.isolates(self._g)))
+
     async def reset(self) -> None:
         self._g = nx.MultiDiGraph()
         self._dirty = True

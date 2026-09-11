@@ -42,7 +42,11 @@ TOOLS: dict[str, dict[str, Any]] = {
     "datamind_use_folder": {
         "description": "Add a file or directory to the active DataMind knowledge base.",
         "inputSchema": {"type": "object", "required": ["path"], "properties": {
-            "path": {"type": "string"}, "profile": {"type": "string", "default": "default"}, "recursive": {"type": "boolean", "default": True}}}},
+            "path": {"type": "string"}, "profile": {"type": "string", "default": "default"}, "recursive": {"type": "boolean", "default": True}, "build_graph": {"type": "boolean", "default": True}}}},
+    "datamind_graph_ingest": {
+        "description": "Extract and persist graph triples from a text file or directory with source provenance.",
+        "inputSchema": {"type": "object", "required": ["path"], "properties": {
+            "path": {"type": "string"}, "profile": {"type": "string", "default": "default"}, "recursive": {"type": "boolean", "default": True}, "max_triples_per_file": {"type": "integer", "minimum": 1, "maximum": 200, "default": 30}}}},
     "datamind_rag_query": {
         "description": "Search the active profile knowledge base with vector RAG.",
         "inputSchema": {"type": "object", "required": ["query"], "properties": {
@@ -93,7 +97,14 @@ async def execute(name: str, args: dict[str, Any]) -> dict[str, Any]:
                 return await system.ingest(str(args["message"]))
             if name == "datamind_use_folder":
                 spec = system.store.tools.get("kb_add_path")
-                return await spec.handler(path=str(args["path"]), recursive=bool(args.get("recursive", True)))
+                result = {"kb": await spec.handler(path=str(args["path"]), recursive=bool(args.get("recursive", True)))}
+                if args.get("build_graph", True):
+                    graph_spec = system.store.tools.get("graph_add_path")
+                    result["graph"] = await graph_spec.handler(path=str(args["path"]), recursive=bool(args.get("recursive", True)))
+                return result
+            if name == "datamind_graph_ingest":
+                spec = system.store.tools.get("graph_add_path")
+                return await spec.handler(path=str(args["path"]), recursive=bool(args.get("recursive", True)), max_triples_per_file=int(args.get("max_triples_per_file", 30)))
             if name == "datamind_rag_query":
                 spec = system.retrieve.tools.get("kb_search")
                 return await spec.handler(query=str(args["query"]), top_k=int(args.get("top_k", 5)))
