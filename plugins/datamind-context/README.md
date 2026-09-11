@@ -22,6 +22,7 @@ DataMind package into the repository virtual environment. Edit the generated
 - `datamind_store` — write through StoreAgent and return receipts.
 - `datamind_use_folder` — ingest a file or directory through the KB ingest tools.
 - `datamind_graph_ingest` — build a graph from one or more text files with source provenance.
+- `datamind_graph_build_lineage` — build a deterministic file-dependency graph from a workspace.
 - `datamind_workspace_inspect` — inspect workspace files, hashes, and candidate surfaces before building.
 - `datamind_rag_query` — perform direct vector search.
 - `datamind_graph_query` — ask a relationship question using graph tools.

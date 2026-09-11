@@ -18,6 +18,13 @@ class _Store:
     async def upsert_triples(self, triples):
         self.triples.extend(triples)
 
+    async def reconcile_lineage_triples(self, root, triples):
+        self.triples = [
+            item for item in self.triples
+            if item.properties.get("_lineage_root") != root
+        ]
+        self.triples.extend(triples)
+
     async def persist(self):
         return None
 
@@ -75,6 +82,35 @@ async def test_workspace_inspect_caps_file_listing(tmp_path: Path):
     assert result["files_scanned"] == 2
     assert result["truncated"] is True
     assert all(item["sha256"] is None for item in result["files"])
+
+
+@pytest.mark.asyncio
+async def test_graph_build_lineage_adds_deterministic_file_relations(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / "report.md").write_text("See source.csv", encoding="utf-8")
+    (workspace / "source.csv").write_text("item,cost\na,1\n", encoding="utf-8")
+    (workspace / "source-v2.csv").write_text("item,cost\nb,2\n", encoding="utf-8")
+    (workspace / "duplicate.txt").write_text("same", encoding="utf-8")
+    (workspace / "copy.txt").write_text("same", encoding="utf-8")
+
+    graph = _Graph()
+    service = IngestService(
+        kb=None,
+        db=None,
+        graph=graph,
+        llm_client=_Model(),
+        llm_model="test",
+        profile_data_dir=tmp_path / "profile",
+        chunk_size=512,
+        chunk_overlap=64,
+    )
+    result = await service.graph_build_lineage(path=str(workspace))
+    relations = {triple.relation for triple in graph.store.triples}
+
+    assert result["files_processed"] == 5
+    assert {"contains", "mentions", "schema_overlap", "version_of", "shared_artifact"} <= relations
+    assert all(triple.properties["_lineage_root"] == str(workspace) for triple in graph.store.triples)
 
 
 @pytest.mark.asyncio

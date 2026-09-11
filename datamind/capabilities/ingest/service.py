@@ -66,6 +66,13 @@ _WORKSPACE_SURFACE_EXTS: dict[str, tuple[str, ...]] = {
     ".pptx": ("kb", "graph_text"),
 }
 
+_LINEAGE_TEXT_EXTS = {".txt", ".md", ".markdown", ".html", ".json", ".xml", ".py", ".java"}
+_LINEAGE_TABLE_EXTS = {".csv", ".tsv"}
+_LINEAGE_VERSION_MARKER_RE = re.compile(
+    r"[ _\-]*(v\d+|final|draft|copy|revised|updated|old|new|\(\d+\)|\d{4}[-_]\d{2}[-_]\d{2})$",
+    re.IGNORECASE,
+)
+
 
 # ============================================================ path safety
 
@@ -252,6 +259,155 @@ class IngestService:
             "by_extension": dict(sorted(by_extension.items())),
             "by_surface": dict(sorted(by_surface.items())),
             "files": files,
+        }
+
+    async def graph_build_lineage(
+        self,
+        *,
+        path: str,
+        recursive: bool = True,
+        max_files: int = 2000,
+    ) -> dict[str, Any]:
+        """Build a deterministic file-lineage graph for a workspace.
+
+        The graph is intentionally rule-based: file containment, textual
+        mentions, tabular schema overlap, version names, and duplicate hashes.
+        It complements (and does not replace) LLM concept-triple extraction.
+        """
+        if self._graph is None:
+            raise CapabilityError("ingest", "Graph surface is disabled")
+        inventory = await self.workspace_inspect(
+            path=path, recursive=recursive, include_hash=True, max_files=max_files,
+        )
+        resolved = Path(inventory["path"])
+        files = [item for item in inventory["files"] if item.get("status") == "supported"]
+        if not files:
+            return {
+                "path": str(resolved), "nodes_added": 0, "edges_added": 0,
+                "files_processed": 0, "truncated": inventory["truncated"],
+            }
+
+        root = str(resolved if resolved.is_dir() else resolved.parent)
+        root_id = _hash(root, "lineage")[:12]
+        workspace_node = f"workspace::{root_id}"
+        file_nodes: dict[str, str] = {}
+        file_text: dict[str, str] = {}
+        file_columns: dict[str, set[str]] = {}
+        for item in files:
+            candidate = Path(item["path"])
+            rel = item.get("relative_path") or candidate.name
+            node = f"file::{root_id}::{rel}"
+            file_nodes[str(candidate)] = node
+            suffix = item.get("extension", "")
+            if suffix in _LINEAGE_TEXT_EXTS:
+                try:
+                    file_text[str(candidate)] = candidate.read_text(
+                        encoding="utf-8", errors="replace"
+                    )[:200_000]
+                except OSError:
+                    pass
+            if suffix in _LINEAGE_TABLE_EXTS:
+                try:
+                    delimiter = "\t" if suffix == ".tsv" else ","
+                    with candidate.open("r", encoding="utf-8", errors="replace", newline="") as handle:
+                        header = next(csv.reader(handle, delimiter=delimiter), [])
+                    file_columns[str(candidate)] = {
+                        re.sub(r"[^a-z0-9]+", "_", col.strip().lower()).strip("_")
+                        for col in header if col.strip()
+                    }
+                except (OSError, StopIteration):
+                    pass
+
+        triples: list[GraphTriple] = []
+        properties_base = {"_lineage_root": root, "_source_managed": True}
+        for item in files:
+            candidate = Path(item["path"])
+            node = file_nodes[str(candidate)]
+            triples.append(GraphTriple(
+                subject=workspace_node,
+                relation="contains",
+                object=node,
+                source=root,
+                properties={**properties_base, "source_file": str(candidate), "sha256": item.get("sha256")},
+            ))
+
+        # Mentions: a text file explicitly names another file in the same workspace.
+        for source_path, text_content in file_text.items():
+            source_node = file_nodes[source_path]
+            for target_path, target_node in file_nodes.items():
+                if source_path == target_path:
+                    continue
+                target_name = Path(target_path).name
+                if target_name and target_name in text_content:
+                    triples.append(GraphTriple(
+                        subject=source_node, relation="mentions", object=target_node,
+                        source=root,
+                        properties={**properties_base, "source_file": source_path},
+                    ))
+
+        table_items = list(file_columns.items())
+        for index, (left_path, left_cols) in enumerate(table_items):
+            for right_path, right_cols in table_items[index + 1:]:
+                union = left_cols | right_cols
+                if not union:
+                    continue
+                jaccard = len(left_cols & right_cols) / len(union)
+                if jaccard >= 0.5:
+                    triples.append(GraphTriple(
+                        subject=file_nodes[left_path], relation="schema_overlap",
+                        object=file_nodes[right_path], source=root,
+                        properties={**properties_base, "source_file": left_path, "jaccard": round(jaccard, 3)},
+                    ))
+
+        paths = list(file_nodes.items())
+        for index, (left_path, left_node) in enumerate(paths):
+            left_stem = _LINEAGE_VERSION_MARKER_RE.sub(
+                "", Path(left_path).stem
+            ).strip().lower()
+            for right_path, right_node in paths[index + 1:]:
+                if left_stem and left_stem == _LINEAGE_VERSION_MARKER_RE.sub(
+                    "", Path(right_path).stem
+                ).strip().lower() and Path(left_path).name != Path(right_path).name:
+                    triples.append(GraphTriple(
+                        subject=left_node, relation="version_of", object=right_node,
+                        source=root,
+                        properties={**properties_base, "source_file": left_path},
+                    ))
+
+        by_hash: dict[str, list[str]] = {}
+        for item in files:
+            digest = item.get("sha256")
+            if digest:
+                by_hash.setdefault(str(digest), []).append(str(item["path"]))
+        for digest, members in by_hash.items():
+            if len(members) < 2:
+                continue
+            for index, left_path in enumerate(members):
+                for right_path in members[index + 1:]:
+                    triples.append(GraphTriple(
+                        subject=file_nodes[left_path], relation="shared_artifact",
+                        object=file_nodes[right_path], source=root,
+                        properties={**properties_base, "source_file": left_path, "sha256": digest},
+                    ))
+
+        reconcile = getattr(self._graph.store, "reconcile_lineage_triples", None)
+        if callable(reconcile):
+            await reconcile(root, triples)
+        else:
+            await self._graph.store.upsert_triples(triples)
+        persist = getattr(self._graph.store, "persist", None)
+        if callable(persist):
+            result = persist()
+            if hasattr(result, "__await__"):
+                await result
+        return {
+            "path": str(resolved),
+            "workspace_node": workspace_node,
+            "files_processed": len(files),
+            "nodes_added": len(files) + 1,
+            "edges_added": len(triples),
+            "relations": dict(sorted({rel: sum(1 for t in triples if t.relation == rel) for rel in {t.relation for t in triples}}.items())),
+            "truncated": inventory["truncated"],
         }
 
     # ------------------------------------------------------------- KB

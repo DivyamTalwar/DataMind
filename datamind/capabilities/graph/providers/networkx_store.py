@@ -171,6 +171,19 @@ class NetworkXGraphStore:
         await self.upsert_triples(triples)
         self._g.remove_nodes_from(list(nx.isolates(self._g)))
 
+    async def reconcile_lineage_triples(
+        self, root: str, triples: Sequence[GraphTriple]
+    ) -> None:
+        """Replace all deterministic lineage edges for one workspace root."""
+        stale = [
+            (u, v, key)
+            for u, v, key, data in self._g.edges(keys=True, data=True)
+            if data.get("p__lineage_root") == root
+        ]
+        self._g.remove_edges_from(stale)
+        await self.upsert_triples(triples)
+        self._g.remove_nodes_from(list(nx.isolates(self._g)))
+
     async def reset(self) -> None:
         self._g = nx.MultiDiGraph()
         self._dirty = True

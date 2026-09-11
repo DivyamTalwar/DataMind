@@ -43,6 +43,13 @@ def build_ingest_tools(svc: IngestService) -> list[ToolSpec]:
             max_files=max_files,
         )
 
+    async def _graph_build_lineage(
+        path: str, recursive: bool = True, max_files: int = 2000
+    ) -> dict:
+        return await svc.graph_build_lineage(
+            path=path, recursive=recursive, max_files=max_files
+        )
+
     async def _kb_add_file(path: str, copy_to_profile: bool = True) -> dict:
         return await svc.kb_add_file(path=path, copy_to_profile=copy_to_profile)
 
@@ -105,6 +112,25 @@ def build_ingest_tools(svc: IngestService) -> list[ToolSpec]:
             },
             handler=_workspace_inspect,
             metadata={"group": "workspace", "access": "utility"},
+        ),
+        ToolSpec(
+            name="graph_build_lineage",
+            description=(
+                "Build or replace a deterministic file-lineage graph for a workspace. "
+                "It records containment, textual file mentions, CSV/TSV schema overlap, "
+                "version-name matches, duplicate content hashes, and source provenance."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Workspace file or directory."},
+                    "recursive": {"type": "boolean", "default": True},
+                    "max_files": {"type": "integer", "minimum": 1, "maximum": 10000, "default": 2000},
+                },
+                "required": ["path"],
+            },
+            handler=_graph_build_lineage,
+            metadata={"group": "ingest", "surface": "graph", "access": "write"},
         ),
         ToolSpec(
             name="kb_add_text",
