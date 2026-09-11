@@ -61,6 +61,12 @@ dependencies = [
 
     # Async primitives
     "anyio>=4.2",
+
+    # Workspace document/table extraction
+    "pypdf>=5.0",
+    "python-docx>=1.1",
+    "python-pptx>=1.0",
+    "openpyxl>=3.1",
 ]
 
 [project.urls]

@@ -16,6 +16,7 @@ Prefer these tools:
 - `datamind_graph_ingest` to build only the graph from text files, or pass
   `build_graph=true` to `datamind_use_folder` to build KB and Graph together.
 - `datamind_graph_build_lineage` to build file dependencies and provenance from a workspace.
+- `datamind_table_ingest` to import CSV/TSV or Excel sheets as queryable tables.
 - `datamind_ask` for an evidence-backed answer across DataMind surfaces.
 - `datamind_rag_query` for direct document search.
 - `datamind_graph_query` for relationship and multi-hop questions.

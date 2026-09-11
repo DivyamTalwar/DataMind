@@ -60,6 +60,12 @@ TOOLS: dict[str, dict[str, Any]] = {
             "path": {"type": "string"}, "profile": {"type": "string", "default": "default"},
             "recursive": {"type": "boolean", "default": True},
             "max_files": {"type": "integer", "minimum": 1, "maximum": 10000, "default": 2000}}}},
+    "datamind_table_ingest": {
+        "description": "Import CSV/TSV or every sheet in an XLSX workbook into DataMind SQL.",
+        "inputSchema": {"type": "object", "required": ["path"], "properties": {
+            "path": {"type": "string"}, "profile": {"type": "string", "default": "default"},
+            "table_prefix": {"type": ["string", "null"]},
+            "if_exists": {"type": "string", "enum": ["append", "replace", "fail"], "default": "append"}}}},
     "datamind_rag_query": {
         "description": "Search the active profile knowledge base with vector RAG.",
         "inputSchema": {"type": "object", "required": ["query"], "properties": {
@@ -129,6 +135,9 @@ async def execute(name: str, args: dict[str, Any]) -> dict[str, Any]:
             if name == "datamind_graph_build_lineage":
                 spec = system.store.tools.get("graph_build_lineage")
                 return await spec.handler(path=str(args["path"]), recursive=bool(args.get("recursive", True)), max_files=int(args.get("max_files", 2000)))
+            if name == "datamind_table_ingest":
+                spec = system.store.tools.get("db_import_path")
+                return await spec.handler(path=str(args["path"]), table_prefix=args.get("table_prefix"), if_exists=str(args.get("if_exists", "append")))
             if name == "datamind_rag_query":
                 spec = system.retrieve.tools.get("kb_search")
                 return await spec.handler(query=str(args["query"]), top_k=int(args.get("top_k", 5)))

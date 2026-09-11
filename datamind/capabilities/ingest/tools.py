@@ -78,6 +78,16 @@ def build_ingest_tools(svc: IngestService) -> list[ToolSpec]:
             if_exists=if_exists,
         )
 
+    async def _db_import_path(
+        path: str,
+        table_prefix: str | None = None,
+        if_exists: str = "append",
+        delimiter: str = ",",
+    ) -> dict:
+        return await svc.db_import_path(
+            path=path, table_prefix=table_prefix, if_exists=if_exists, delimiter=delimiter
+        )
+
     async def _graph_add_triples_from_text(text: str, max_triples: int = 30) -> dict:
         return await svc.graph_add_triples_from_text(text=text, max_triples=max_triples)
 
@@ -273,6 +283,25 @@ def build_ingest_tools(svc: IngestService) -> list[ToolSpec]:
                 "required": ["table", "records"],
             },
             handler=_db_import_records,
+            metadata={"group": "ingest", "surface": "db", "access": "write"},
+        ),
+        ToolSpec(
+            name="db_import_path",
+            description=(
+                "Import a CSV/TSV file or every sheet in an XLSX workbook into the SQL surface. "
+                "Each workbook sheet becomes a separate table with source metadata."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "table_prefix": {"type": ["string", "null"]},
+                    "if_exists": {"type": "string", "enum": ["append", "replace", "fail"], "default": "append"},
+                    "delimiter": {"type": "string", "default": ","},
+                },
+                "required": ["path"],
+            },
+            handler=_db_import_path,
             metadata={"group": "ingest", "surface": "db", "access": "write"},
         ),
         ToolSpec(

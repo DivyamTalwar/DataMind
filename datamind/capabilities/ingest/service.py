@@ -26,6 +26,7 @@ import hashlib
 import io
 import json
 import re
+import shutil
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -43,6 +44,8 @@ from datamind.capabilities.graph.service import GraphService
 from datamind.core.errors import CapabilityError
 from datamind.core.logging import get_logger
 from datamind.core.protocols import GraphTriple, TextModelClient
+
+from .formats import DOCUMENT_EXTS, TABLE_EXTS, extract_document, extract_tabular
 
 _log = get_logger("ingest")
 
@@ -479,12 +482,15 @@ class IngestService:
         resolved = self._locate_file(path)
         if not resolved.is_file():
             raise CapabilityError("ingest", f"not a file: {resolved}")
-        if resolved.suffix.lower() not in _TEXT_EXTS:
+        if resolved.suffix.lower() not in DOCUMENT_EXTS:
             raise CapabilityError("ingest", f"unsupported extension '{resolved.suffix}'. "
-                f"Supported: {sorted(_TEXT_EXTS)}"
+                f"Supported: {sorted(DOCUMENT_EXTS)}"
             )
-
-        text = resolved.read_text(encoding="utf-8", errors="replace")
+        try:
+            extracted = extract_document(resolved)
+        except RuntimeError as exc:
+            raise CapabilityError("ingest", str(exc)) from exc
+        text = extracted.text
         if copy_to_profile:
             dest_dir = self._profile_dir / "uploads"
             dest_dir.mkdir(parents=True, exist_ok=True)
@@ -495,9 +501,14 @@ class IngestService:
             except ValueError:
                 dest = dest_dir / resolved.name
                 # Avoid clobbering existing distinct content.
-                if dest.exists() and dest.read_text(encoding="utf-8", errors="replace") != text:
-                    dest = dest_dir / f"{resolved.stem}-{_hash(text, resolved.name)[:8]}{resolved.suffix}"
-                dest.write_text(text, encoding="utf-8")
+                if dest.exists():
+                    same = dest.read_bytes() == resolved.read_bytes()
+                    if not same:
+                        dest = dest_dir / f"{resolved.stem}-{_hash(text, resolved.name)[:8]}{resolved.suffix}"
+                if resolved.suffix.lower() in _TEXT_EXTS:
+                    dest.write_text(text, encoding="utf-8")
+                else:
+                    shutil.copy2(resolved, dest)
                 copied_to = str(dest.relative_to(self._profile_dir))
         else:
             copied_to = None
@@ -531,6 +542,9 @@ class IngestService:
             "chunks_added": len(chunks),
             "copied_to": copied_to,
             "source": source,
+            "format": extracted.format,
+            "blocks": len(extracted.blocks),
+            "warnings": extracted.warnings,
         }
 
     async def kb_add_path(
@@ -562,7 +576,7 @@ class IngestService:
         for p in sorted(iter_func("*")):
             if not p.is_file():
                 continue
-            if p.suffix.lower() not in _TEXT_EXTS:
+            if p.suffix.lower() not in DOCUMENT_EXTS:
                 skipped.append(str(p))
                 continue
             try:
@@ -781,6 +795,49 @@ class IngestService:
             "if_exists": if_exists,
             "source": "inline_records",
         }
+
+    async def db_import_path(
+        self,
+        *,
+        path: str,
+        table_prefix: str | None = None,
+        if_exists: str = "append",
+        delimiter: str = ",",
+    ) -> dict[str, Any]:
+        """Import CSV/TSV or every sheet in an XLSX workbook into DB tables."""
+        if self._db is None:
+            raise CapabilityError("ingest", "DB surface is disabled")
+        resolved = self._locate_file(path)
+        if not resolved.is_file():
+            raise CapabilityError("ingest", f"not a file: {resolved}")
+        suffix = resolved.suffix.lower()
+        if suffix in {".csv", ".tsv"}:
+            result = await self.db_import_csv(
+                path=str(resolved),
+                table=table_prefix or resolved.stem,
+                if_exists=if_exists,
+                delimiter="\t" if suffix == ".tsv" else delimiter,
+            )
+            return {"source_file": str(resolved), "tables": [result], "tables_processed": 1}
+        if suffix not in TABLE_EXTS:
+            raise CapabilityError("ingest", "db_import_path supports .csv, .tsv, .xlsx and .xls")
+        try:
+            sheets = extract_tabular(resolved)
+        except RuntimeError as exc:
+            raise CapabilityError("ingest", str(exc)) from exc
+        prefix = table_prefix or resolved.stem
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,48}", prefix):
+            raise CapabilityError("ingest", "table_prefix must contain letters, digits and underscores")
+        results: list[dict[str, Any]] = []
+        for sheet_name, _columns, rows in sheets:
+            if not rows:
+                continue
+            safe_sheet = re.sub(r"[^A-Za-z0-9_]+", "_", sheet_name).strip("_") or "sheet"
+            table = f"{prefix}_{safe_sheet}"[:64]
+            results.append(await self.db_import_records(table=table, records=rows, if_exists=if_exists))
+            results[-1]["sheet"] = sheet_name
+            results[-1]["source_file"] = str(resolved)
+        return {"source_file": str(resolved), "tables": results, "tables_processed": len(results)}
 
     # ------------------------------------------------------------- Graph
 
