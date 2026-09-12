@@ -44,7 +44,7 @@ def test_pdf_prefers_mineru_and_falls_back_to_pypdf(tmp_path: Path, monkeypatch)
     monkeypatch.setattr(formats, "_mineru_text", lambda path: ("# MinerU", [{"type": "markdown"}]))
     result = extract_document(pdf)
     assert result.text == "# MinerU"
-    assert "parsed with MinerU" in result.warnings
+    assert "parsed with MinerU API" in result.warnings
 
     monkeypatch.setattr(formats, "_mineru_text", lambda path: (_ for _ in ()).throw(RuntimeError("missing")))
     monkeypatch.setattr(formats, "_pdf_text", lambda path: ("fallback", [{"type": "page", "page": 1}]))
