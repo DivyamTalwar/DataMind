@@ -11,6 +11,8 @@ or inspect profiles.
 
 Prefer these tools:
 
+- `datamind_raw_file_read` — read paginated source or extracted document evidence with SHA-256.
+- `datamind_build_status` — inspect build state and verify frozen artifacts.
 - `datamind_workspace_inspect` before building surfaces from a workspace.
 - `datamind_use_folder` to add a file or directory.
 - `datamind_graph_ingest` to build only the graph from text files, or pass
