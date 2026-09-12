@@ -188,3 +188,41 @@ async def test_graph_add_path_rejects_unsupported_single_file(tmp_path: Path):
 
     with pytest.raises(CapabilityError, match="unsupported extension"):
         await service.graph_add_path(path=str(source))
+
+@pytest.mark.asyncio
+async def test_raw_file_read_is_paginated_and_hashed(tmp_path: Path):
+    source = tmp_path / "evidence.md"
+    source.write_text("abcdef", encoding="utf-8")
+    service = _service(tmp_path)
+    page = await service.raw_file_read(path=str(source), offset=2, max_chars=3)
+    assert page["text"] == "cde"
+    assert page["next_offset"] == 5
+    assert page["truncated"] is True
+    assert page["sha256"].startswith("sha256:")
+
+
+@pytest.mark.asyncio
+async def test_lineage_accepts_explicit_dependencies(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / "answer.md").write_text("answer", encoding="utf-8")
+    (workspace / "data.csv").write_text("id\n1\n", encoding="utf-8")
+    graph = _Graph()
+    service = IngestService(kb=None, db=None, graph=graph, llm_client=_Model(), llm_model="test",
+                            profile_data_dir=tmp_path / "profile", chunk_size=512, chunk_overlap=64)
+    result = await service.graph_build_lineage(path=str(workspace), dependencies=[{"source": "answer.md", "target": "data.csv"}])
+    assert result["relations"]["depends_on"] == 1
+
+
+@pytest.mark.asyncio
+async def test_build_status_reports_frozen_verification(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / "notes.md").write_text("x", encoding="utf-8")
+    service = _service(tmp_path)
+    started = await service.build_start(path=str(workspace))
+    assert (await service.build_status(build_id=started["build_id"]))["status"] == "BUILDING"
+    await service.build_freeze(build_id=started["build_id"])
+    status = await service.build_status(build_id=started["build_id"])
+    assert status["status"] == "FROZEN"
+    assert status["verification"]["ok"] is True

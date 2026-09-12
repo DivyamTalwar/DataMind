@@ -272,6 +272,7 @@ class IngestService:
         path: str,
         recursive: bool = True,
         max_files: int = 2000,
+        dependencies: list[dict[str, str]] | None = None,
     ) -> dict[str, Any]:
         """Build a deterministic file-lineage graph for a workspace.
 
@@ -395,6 +396,25 @@ class IngestService:
                         properties={**properties_base, "source_file": left_path, "sha256": digest},
                     ))
 
+        # Explicit file dependencies use workspace-relative paths and are never inferred.
+        for edge in dependencies or []:
+            if edge.get("relation", "depends_on") != "depends_on":
+                raise CapabilityError("ingest", "explicit file dependencies only support depends_on")
+            endpoints = []
+            for field in ("source", "target"):
+                value = edge.get(field)
+                if not value:
+                    raise CapabilityError("ingest", f"dependency {field} is required")
+                endpoint = str((Path(root) / value).resolve())
+                if endpoint not in file_nodes:
+                    raise CapabilityError("ingest", f"dependency file not in inventory: {value}")
+                endpoints.append(endpoint)
+            triples.append(GraphTriple(
+                subject=file_nodes[endpoints[0]], relation="depends_on",
+                object=file_nodes[endpoints[1]], source=root,
+                properties={**properties_base, "source_file": endpoints[0], "evidence": "explicit"},
+            ))
+
         reconcile = getattr(self._graph.store, "reconcile_lineage_triples", None)
         if callable(reconcile):
             await reconcile(root, triples)
@@ -426,12 +446,51 @@ class IngestService:
         return f"sha256:{digest.hexdigest()}"
 
     def _build_dir(self, build_id: str) -> Path:
+        if not re.fullmatch(r"build-[A-Za-z0-9-]+", build_id):
+            raise CapabilityError("ingest", "invalid build_id")
         return self._profile_dir / "builds" / build_id
 
     def _profile_storage_dir(self) -> Path:
         # profile_data_dir is <base>/data/profiles/<profile>; indexes live in
         # the sibling <base>/storage/<profile> directory.
         return self._profile_dir.parents[2] / "storage" / self._profile_dir.name
+
+    async def raw_file_read(
+        self, *, path: str, offset: int = 0, max_chars: int = 20000,
+    ) -> dict[str, Any]:
+        """Read source evidence without writing to any surface; offsets count characters."""
+        if offset < 0 or not 1 <= max_chars <= 100000:
+            raise CapabilityError("ingest", "offset must be nonnegative and max_chars between 1 and 100000")
+        resolved = self._locate_file(path)
+        if not resolved.is_file():
+            raise CapabilityError("ingest", f"not a file: {resolved}")
+        try:
+            if resolved.suffix.lower() in DOCUMENT_EXTS:
+                extracted = extract_document(resolved)
+                content, warnings = extracted.text, extracted.warnings
+            elif resolved.suffix.lower() in {".csv", ".tsv"}:
+                content, warnings = resolved.read_text(encoding="utf-8"), []
+            else:
+                raise CapabilityError("ingest", f"no readable text representation for {resolved.suffix}")
+        except (RuntimeError, OSError, ValueError) as exc:
+            raise CapabilityError("ingest", f"cannot read {resolved.name}: {exc}") from exc
+        end = min(offset + max_chars, len(content))
+        return {"path": str(resolved), "sha256": self._file_hash(resolved),
+                "text": content[offset:end], "offset": offset,
+                "next_offset": end if end < len(content) else None,
+                "total_chars": len(content), "truncated": end < len(content),
+                "warnings": warnings}
+
+    async def build_status(self, *, build_id: str) -> dict[str, Any]:
+        state_path = self._build_dir(build_id) / "state.json"
+        if not state_path.is_file():
+            raise CapabilityError("ingest", f"unknown build_id '{build_id}'")
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        result = {key: value for key, value in state.items() if key != "source_inventory"}
+        result["source_files"] = state["source_inventory"]["files_scanned"]
+        if state["status"] == "FROZEN":
+            result["verification"] = await self.build_verify(build_id=build_id)
+        return result
 
     async def build_start(self, *, path: str) -> dict[str, Any]:
         """Start a build run and record the immutable source inventory."""
@@ -652,12 +711,23 @@ class IngestService:
                 id=_hash(seg, source, ordinal=ordinal),
                 text=seg,
                 source=source,
-                metadata={"_origin": "ingest", "_chunk_ordinal": ordinal},
+                metadata={"_origin": "ingest", "_chunk_ordinal": ordinal,
+                          "source_file": str(resolved), "source_sha256": self._file_hash(resolved)},
             ))
 
         if not chunks:
             return {"file": str(resolved), "chunks_added": 0, "note": "file was empty"}
 
+        parsed_chunks = None
+        if copy_to_profile and resolved.suffix.lower() not in _TEXT_EXTS:
+            chunk_dir = self._profile_dir / "chunks"
+            chunk_dir.mkdir(parents=True, exist_ok=True)
+            chunk_file = chunk_dir / f"ingest-{_hash(source, 'parsed')}.jsonl"
+            chunk_file.write_text("".join(json.dumps({
+                "id": chunk.id, "text": chunk.text, "source": chunk.source,
+                "metadata": chunk.metadata,
+            }, ensure_ascii=False) + "\n" for chunk in chunks), encoding="utf-8")
+            parsed_chunks = str(chunk_file.relative_to(self._profile_dir))
         await self._upsert_chunks(chunks)
         _log.info("kb_add_file", extra={
             "file": str(resolved), "chunks": len(chunks), "copied_to": copied_to
@@ -667,6 +737,7 @@ class IngestService:
             "chunks_added": len(chunks),
             "copied_to": copied_to,
             "source": source,
+            "parsed_chunks": parsed_chunks,
             "format": extracted.format,
             "blocks": len(extracted.blocks),
             "warnings": extracted.warnings,
@@ -963,6 +1034,45 @@ class IngestService:
             results[-1]["sheet"] = sheet_name
             results[-1]["source_file"] = str(resolved)
         return {"source_file": str(resolved), "tables": results, "tables_processed": len(results)}
+
+    async def surface_ingest_path(
+        self,
+        *,
+        path: str,
+        surfaces: list[str] | None = None,
+        recursive: bool = True,
+    ) -> dict[str, Any]:
+        """Route a workspace into KB, DB, and deterministic Graph surfaces."""
+        selected = set(["kb", "db", "graph"] if surfaces is None else surfaces)
+        unknown = selected - {"kb", "db", "graph"}
+        if unknown:
+            raise CapabilityError("ingest", f"unknown surfaces: {sorted(unknown)}")
+        inventory = await self.workspace_inspect(path=path, recursive=recursive, include_hash=True)
+        results: dict[str, Any] = {"path": inventory["path"], "inventory": inventory}
+        results["disabled_surfaces"] = sorted(
+            name for name in selected if getattr(self, f"_{name}") is None
+        )
+        if "kb" in selected and self._kb is not None:
+            results["kb"] = await self.kb_add_path(path=path, recursive=recursive)
+        if "db" in selected and self._db is not None:
+            tables: list[dict[str, Any]] = []
+            for item in inventory["files"]:
+                if item.get("extension") not in TABLE_EXTS or item.get("status") != "supported":
+                    continue
+                try:
+                    relative = item["relative_path"]
+                    stem = re.sub(r"[^A-Za-z0-9_]+", "_", Path(relative).stem).strip("_") or "table"
+                    prefix = f"ws_{stem[:28]}_{_hash(relative, inventory['path'])[:8]}"
+                    tables.append(await self.db_import_path(
+                        path=item["path"], table_prefix=prefix, if_exists="replace",
+                    ))
+                except (CapabilityError, OSError, ValueError) as exc:
+                    tables.append({"source_file": item["path"], "error": str(exc)})
+            results["db"] = {"tables": tables, "files_processed": len(tables)}
+        if "graph" in selected and self._graph is not None:
+            results["graph"] = await self.graph_build_lineage(path=path, recursive=recursive)
+        results["surfaces"] = sorted(selected)
+        return results
 
     # ------------------------------------------------------------- Graph
 

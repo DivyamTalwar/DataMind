@@ -44,11 +44,18 @@ def build_ingest_tools(svc: IngestService) -> list[ToolSpec]:
         )
 
     async def _graph_build_lineage(
-        path: str, recursive: bool = True, max_files: int = 2000
+        path: str, recursive: bool = True, max_files: int = 2000,
+        dependencies: list[dict[str, str]] | None = None,
     ) -> dict:
         return await svc.graph_build_lineage(
-            path=path, recursive=recursive, max_files=max_files
+            path=path, recursive=recursive, max_files=max_files, dependencies=dependencies,
         )
+
+    async def _raw_file_read(path: str, offset: int = 0, max_chars: int = 20000) -> dict:
+        return await svc.raw_file_read(path=path, offset=offset, max_chars=max_chars)
+
+    async def _build_status(build_id: str) -> dict:
+        return await svc.build_status(build_id=build_id)
 
     async def _build_start(path: str) -> dict:
         return await svc.build_start(path=path)
@@ -100,6 +107,11 @@ def build_ingest_tools(svc: IngestService) -> list[ToolSpec]:
             path=path, table_prefix=table_prefix, if_exists=if_exists, delimiter=delimiter
         )
 
+    async def _surface_ingest_path(
+        path: str, surfaces: list[str] | None = None, recursive: bool = True
+    ) -> dict:
+        return await svc.surface_ingest_path(path=path, surfaces=surfaces, recursive=recursive)
+
     async def _graph_add_triples_from_text(text: str, max_triples: int = 30) -> dict:
         return await svc.graph_add_triples_from_text(text=text, max_triples=max_triples)
 
@@ -115,6 +127,23 @@ def build_ingest_tools(svc: IngestService) -> list[ToolSpec]:
         )
 
     return [
+        ToolSpec(
+            name="raw_file_read",
+            description="Read paginated source text or extracted document text, with its source hash, without ingestion.",
+            input_schema={"type": "object", "properties": {
+                "path": {"type": "string"}, "offset": {"type": "integer", "minimum": 0, "default": 0},
+                "max_chars": {"type": "integer", "minimum": 1, "maximum": 100000, "default": 20000}},
+                "required": ["path"]},
+            handler=_raw_file_read,
+            metadata={"group": "workspace", "access": "utility"},
+        ),
+        ToolSpec(
+            name="build_status",
+            description="Inspect a build's lifecycle state and verify frozen artifacts if applicable.",
+            input_schema={"type": "object", "properties": {"build_id": {"type": "string"}}, "required": ["build_id"]},
+            handler=_build_status,
+            metadata={"group": "workspace", "access": "utility"},
+        ),
         ToolSpec(
             name="workspace_inspect",
             description=(
@@ -166,6 +195,19 @@ def build_ingest_tools(svc: IngestService) -> list[ToolSpec]:
             metadata={"group": "workspace", "access": "write"},
         ),
         ToolSpec(
+            name="surface_ingest_path",
+            description=(
+                "Inspect and route a workspace into selected DataMind surfaces: documents to KB, "
+                "CSV/TSV/Excel to DB, and deterministic file lineage to Graph."
+            ),
+            input_schema={"type": "object", "properties": {
+                "path": {"type": "string"},
+                "surfaces": {"type": "array", "items": {"type": "string", "enum": ["kb", "db", "graph"]}},
+                "recursive": {"type": "boolean", "default": True}}, "required": ["path"]},
+            handler=_surface_ingest_path,
+            metadata={"group": "workspace", "access": "write"},
+        ),
+        ToolSpec(
             name="graph_build_lineage",
             description=(
                 "Build or replace a deterministic file-lineage graph for a workspace. "
@@ -176,6 +218,11 @@ def build_ingest_tools(svc: IngestService) -> list[ToolSpec]:
                 "type": "object",
                 "properties": {
                     "path": {"type": "string", "description": "Workspace file or directory."},
+                    "dependencies": {"type": "array", "items": {
+                        "type": "object", "required": ["source", "target"], "properties": {
+                            "source": {"type": "string", "description": "Dependent workspace-relative file."},
+                            "target": {"type": "string", "description": "File it depends on."},
+                            "relation": {"type": "string", "enum": ["depends_on"]}}}},
                     "recursive": {"type": "boolean", "default": True},
                     "max_files": {"type": "integer", "minimum": 1, "maximum": 10000, "default": 2000},
                 },

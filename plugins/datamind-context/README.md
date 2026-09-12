@@ -25,6 +25,7 @@ DataMind package into the repository virtual environment. Edit the generated
 - `datamind_graph_build_lineage` — build a deterministic file-dependency graph from a workspace.
 - `datamind_table_ingest` — import CSV/TSV or Excel sheets into the SQL surface.
 - `datamind_build_start` / `datamind_build_freeze` / `datamind_build_verify` / `datamind_build_export` — manage reproducible workspace builds.
+- `datamind_surface_ingest` — route documents, tables, and lineage into their appropriate surfaces.
 - `datamind_workspace_inspect` — inspect workspace files, hashes, and candidate surfaces before building.
 - `datamind_rag_query` — perform direct vector search.
 - `datamind_graph_query` — ask a relationship question using graph tools.

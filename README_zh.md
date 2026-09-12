@@ -27,6 +27,10 @@
 
 > **v1.0.0** —— native + 本地 profile 存储是稳定基线；SDK/CCR 和远程数据库属于集成路径，请在目标环境中验证。
 
+## Workspace Build 与多格式入库
+
+对一个工作区可先用 `workspace_inspect` 盘点文件，再用 `surface_ingest_path` 统一路由：PDF/DOCX/PPTX 等文档进入 KB，CSV/TSV/XLSX 进入 SQL，文件包含、引用、版本、重复内容和显式 `depends_on` 进入 lineage Graph。`raw_file_read` 提供带 SHA-256 和分页偏移的原始证据读取；`build_start` → `build_freeze` → `build_verify` → `build_export` 保证构建结果可复现。旧式 `.doc/.ppt` 需要 LibreOffice 转换，Excel 保留表格结构，不转 PDF。
+
 ## 一句话理解
 
 大多数 Agent 会取数，却没有一个地方放下刚刚学到的新事实。DataMind 把运行时拆成两个明确角色：
