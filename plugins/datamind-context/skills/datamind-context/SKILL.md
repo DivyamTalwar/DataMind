@@ -30,3 +30,6 @@ The plugin is an adapter to the DataMind v1 runtime. Do not assume that it has
 an independent database, index, or memory store. Keep user source files intact;
 DataMind's ingest tools copy or index them according to the active profile and
 path safety policy.
+
+
+PDF 解析支持可选的本地 MinerU 优先适配；未安装或解析失败时自动回退到 `pypdf`。通过 `DATAMIND_MINERU=off` 可强制只使用 `pypdf`，`DATAMIND_MINERU_BIN` 和 `DATAMIND_MINERU_BACKEND` 可指定 MinerU 命令及后端。

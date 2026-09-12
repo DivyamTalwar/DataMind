@@ -9,7 +9,9 @@ from __future__ import annotations
 import csv
 import io
 import json
+import os
 import re
+import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass, field
@@ -47,6 +49,33 @@ class _HTMLTextParser(HTMLParser):
 def _plain_text(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="replace")
 
+
+
+def _mineru_text(path: Path) -> tuple[str, list[dict[str, Any]]]:
+    """Use the local MinerU CLI when installed; return Markdown and blocks."""
+    executable = shutil.which(os.getenv("DATAMIND_MINERU_BIN", "mineru"))
+    if not executable:
+        raise RuntimeError("MinerU CLI is not installed")
+    output_dir = Path(tempfile.mkdtemp(prefix="datamind-mineru-"))
+    try:
+        command = [executable, "-p", str(path), "-o", str(output_dir)]
+        backend = os.getenv("DATAMIND_MINERU_BACKEND")
+        if backend:
+            command.extend(["-b", backend])
+        subprocess.run(command, check=True, capture_output=True, text=True, timeout=300)
+        markdown_files = sorted(output_dir.rglob("*.md"))
+        if not markdown_files:
+            raise RuntimeError("MinerU produced no Markdown output")
+        text = "\n\n".join(item.read_text(encoding="utf-8", errors="replace").strip()
+                               for item in markdown_files).strip()
+        if not text:
+            raise RuntimeError("MinerU produced empty Markdown output")
+        return text, [{"type": "markdown", "path": str(item.relative_to(output_dir)),
+                       "text": item.read_text(encoding="utf-8", errors="replace")} for item in markdown_files]
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        raise RuntimeError(f"MinerU extraction failed: {exc}") from exc
+    finally:
+        shutil.rmtree(output_dir, ignore_errors=True)
 
 def _pdf_text(path: Path) -> tuple[str, list[dict[str, Any]]]:
     try:
@@ -135,7 +164,18 @@ def extract_document(path: str | Path) -> ExtractedDocument:
         text = "\n".join(parser.parts)
         return ExtractedDocument(str(source), "html", text, [{"type": "text", "text": text}], warnings)
     if suffix == ".pdf":
+        # MinerU preserves layout, tables, formulas, and OCR when available.
+        # Keep it optional: deployments without the CLI remain fully usable.
+        mineru_mode = os.getenv("DATAMIND_MINERU", "auto").lower()
+        if mineru_mode not in {"off", "pypdf"}:
+            try:
+                text, blocks = _mineru_text(source)
+                warnings.append("parsed with MinerU")
+                return ExtractedDocument(str(source), "pdf", text, blocks, warnings)
+            except RuntimeError as exc:
+                warnings.append(f"MinerU unavailable; fell back to pypdf: {exc}")
         text, blocks = _pdf_text(source)
+        warnings.append("parsed with pypdf")
         return ExtractedDocument(str(source), "pdf", text, blocks, warnings)
     if suffix == ".docx":
         text, blocks = _docx_text(source)

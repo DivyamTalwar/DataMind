@@ -292,3 +292,6 @@ CI 会运行无网络测试和确定性的 SQLite demo。长跑评测、checkpoi
 ## License
 
 DataMind 基于 [Apache License 2.0](./LICENSE) 发布。
+
+
+PDF 解析支持可选的本地 MinerU 优先适配；未安装或解析失败时自动回退到 `pypdf`。通过 `DATAMIND_MINERU=off` 可强制只使用 `pypdf`，`DATAMIND_MINERU_BIN` 和 `DATAMIND_MINERU_BACKEND` 可指定 MinerU 命令及后端。

@@ -313,3 +313,6 @@ for comparison.
 ## License
 
 DataMind is released under the [Apache License 2.0](./LICENSE).
+
+
+PDF 解析支持可选的本地 MinerU 优先适配；未安装或解析失败时自动回退到 `pypdf`。通过 `DATAMIND_MINERU=off` 可强制只使用 `pypdf`，`DATAMIND_MINERU_BIN` 和 `DATAMIND_MINERU_BACKEND` 可指定 MinerU 命令及后端。

@@ -34,3 +34,20 @@ def test_extract_xlsx_returns_one_table_per_sheet(tmp_path: Path):
     tables = extract_tabular(path)
     assert [table[0] for table in tables] == ["Orders", "Returns"]
     assert tables[0][2][0] == {"item": "A", "cost": 10}
+
+
+def test_pdf_prefers_mineru_and_falls_back_to_pypdf(tmp_path: Path, monkeypatch):
+    from datamind.capabilities.ingest import formats
+    pdf = tmp_path / "scan.pdf"
+    pdf.write_bytes(b"placeholder")
+    monkeypatch.delenv("DATAMIND_MINERU", raising=False)
+    monkeypatch.setattr(formats, "_mineru_text", lambda path: ("# MinerU", [{"type": "markdown"}]))
+    result = extract_document(pdf)
+    assert result.text == "# MinerU"
+    assert "parsed with MinerU" in result.warnings
+
+    monkeypatch.setattr(formats, "_mineru_text", lambda path: (_ for _ in ()).throw(RuntimeError("missing")))
+    monkeypatch.setattr(formats, "_pdf_text", lambda path: ("fallback", [{"type": "page", "page": 1}]))
+    result = extract_document(pdf)
+    assert result.text == "fallback"
+    assert any("fell back to pypdf" in warning for warning in result.warnings)
