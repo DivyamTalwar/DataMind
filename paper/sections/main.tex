@@ -471,6 +471,60 @@ injected failures cannot identify their effects. If the full system improves
 answer quality but increases unnecessary exploration, the additional tool and
 token measurements make that trade-off explicit.
 
+\begin{table}[t]
+\centering\footnotesize
+\setlength{\tabcolsep}{3.5pt}
+\caption{RQ1 main serving results on WorkSurface-Bench.}
+\label{tab:rq1-main}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}llrrrrrr@{}}
+\toprule
+Model & Condition & Route-F1$\uparrow$ & Evidence$\uparrow$ & Answer$\uparrow$ & Efficiency$\uparrow$ & Tokens$\downarrow$ & p95 ms$\downarrow$ \\
+\midrule
+GPT-4o-mini & ReAct-all & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+GPT-4o-mini & DataMind-full & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+DeepSeek-V4-Pro & ReAct-all & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+DeepSeek-V4-Pro & DataMind-full & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+Gemini-3.1-Pro & ReAct-all & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+Gemini-3.1-Pro & DataMind-full & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+GPT-5.5 & ReAct-all & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+GPT-5.5 & DataMind-full & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}[t]
+\centering\footnotesize
+\caption{RQ1 answer quality by WorkSurface-Bench task type.}
+\label{tab:rq1-type}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+Condition & RAG & Table & Graph & Cross-surface & Evidence \\
+\midrule
+ReAct-all & \tbd & \tbd & \tbd & \tbd & \tbd \\
+Naive-router & \tbd & \tbd & \tbd & \tbd & \tbd \\
+DataMind-full & \tbd & \tbd & \tbd & \tbd & \tbd \\
+Gold-hint/all & \tbd & \tbd & \tbd & \tbd & \tbd \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering\footnotesize
+\caption{RQ1 matched-subset comparison with external systems.}
+\label{tab:rq1-external}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}llrrrrr@{}}
+\toprule
+System & Subset & Route-F1 & Evidence & Answer & p95 ms & Errors \\
+\midrule
+DB-GPT & Table/SQL & \tbd & \tbd & \tbd & \tbd & \tbd \\
+RAGFlow & RAG/document & \tbd & \tbd & \tbd & \tbd & \tbd \\
+DataMind-full & Same subset & \tbd & \tbd & \tbd & \tbd & \tbd \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
 \subsection{RQ2: Build cost and amortization}
 \label{sec:eval-rq2}
 
@@ -497,6 +551,60 @@ aggregate score. This is the experiment that connects WorkSurface-Build to the
 DataMind claim: materialization is useful only when its cost produces durable
 serving value.
 
+\begin{table}[t]
+\centering\footnotesize
+\setlength{\tabcolsep}{3.5pt}
+\caption{RQ2 build cost and materialization coverage.}
+\label{tab:rq2-build}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+Strategy & Time s$\downarrow$ & API calls$\downarrow$ & Storage MB$\downarrow$ & Coverage$\uparrow$ & Provenance$\uparrow$ & Validation failures$\downarrow$ \\
+\midrule
+Document-only & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+Table-only & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+Graph-only & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+Eager-all & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+Heuristic-demand & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+DataMind-build & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}[t]
+\centering\footnotesize
+\caption{RQ2 downstream serving value after materialization.}
+\label{tab:rq2-serving}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+Strategy & $N$ & Answer & Evidence & Efficiency & p95 ms & Cost/query \\
+\midrule
+Document-only & 100 & \tbd & \tbd & \tbd & \tbd & \tbd \\
+Eager-all & 100 & \tbd & \tbd & \tbd & \tbd & \tbd \\
+DataMind-build & 100 & \tbd & \tbd & \tbd & \tbd & \tbd \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}[t]
+\centering\footnotesize
+\caption{Optional ingestion component sensitivity inherited from the earlier
+report. The table is filled only when the same corpus and scorer are used.}
+\label{tab:rq2-ingest}
+\begin{tabular}{@{}lllrrr@{}}
+\toprule
+System & Chunker & Embedder & NDCG@10$\uparrow$ & Recall@10$\uparrow$ & MRR$\uparrow$ \\
+\midrule
+DataMind auto & built-in & \tbd & \tbd & \tbd & \tbd \\
+DataMind BYOP & sentence & \tbd & \tbd & \tbd & \tbd \\
+DataMind BYOP & sentence & \tbd & \tbd & \tbd & \tbd \\
+DataMind BYOP & sentence & \tbd & \tbd & \tbd & \tbd \\
+DB-GPT & built-in & \tbd & \tbd & \tbd & \tbd \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \subsection{RQ3: Runtime overhead and concurrency}
 \label{sec:eval-rq3}
 
@@ -518,6 +626,27 @@ is reported separately from latency averages. The comparison quantifies the
 runtime cost of DataMind's policy, audit, evidence, and version metadata while
 holding model behavior constant.
 
+\begin{table}[t]
+\centering\footnotesize
+\setlength{\tabcolsep}{3.5pt}
+\caption{RQ3 end-to-end latency, throughput, and memory under concurrency.}
+\label{tab:rq3-runtime}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}llrrrrrrr@{}}
+\toprule
+System & Concurrency & $N$ & Errors$\downarrow$ & p50 ms$\downarrow$ & p95 ms$\downarrow$ & p99 ms$\downarrow$ & QPS$\uparrow$ & Peak RSS MB$\downarrow$ \\
+\midrule
+DataMind no-hooks & 1 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+DataMind full & 1 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+DataMind no-hooks & 20 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+DataMind full & 20 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+DataMind no-hooks & 100 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+DataMind full & 100 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+DB-GPT (optional) & 1 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
 \subsection{RQ4: Failure recovery}
 \label{sec:eval-rq4}
 
@@ -537,6 +666,64 @@ task requirement; a plausible answer without a valid receipt is a failure.
 Surface outages and stale-provider blocks are counted as explicit failures,
 not as successful fallbacks. This prevents the recovery experiment from
 rewarding a model for guessing after a source outage.
+
+\begin{table}[t]
+\centering\footnotesize
+\setlength{\tabcolsep}{3.2pt}
+\caption{RQ4 recovery after injected surface and build faults.}
+\label{tab:rq4-faults}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}llrrrrrr@{}}
+\toprule
+Fault & System & Completion & Answer & Auditable & Structured error & Fallback/block & Recovery ms \\
+\midrule
+Parser/MinerU failure & Retry-only & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+Parser/MinerU failure & DataMind-full & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+Database/SQL timeout & Retry-only & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+Database/SQL timeout & DataMind-full & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+Active candidate read & Retry-only & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+Active candidate read & DataMind-full & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+Graph unavailable & Retry-only & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+Graph unavailable & DataMind-full & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+The following two diagnostics preserve the earlier report's scope-isolation
+and tool-policy experiments. They are reported as correctness checks rather
+than as additional claims about the serving quality benchmark.
+
+\begin{table}[t]
+\centering\footnotesize
+\caption{Profile-scoped memory isolation diagnostic.}
+\label{tab:rq4-memory}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+Setting & Memory leakage$\downarrow$ & Memory recall$\uparrow$ & Answer leakage$\downarrow$ & Answer recall$\uparrow$ & Mixed answer$\downarrow$ \\
+\midrule
+Flat namespace & \tbd & \tbd & \tbd & \tbd & \tbd \\
+DataMind three-scope & \tbd & \tbd & \tbd & \tbd & \tbd \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}[t]
+\centering\footnotesize
+\caption{Tool-dispatch SQL policy diagnostic. Ask-user decisions count as
+blocked until confirmation.}
+\label{tab:rq4-policy}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+System & Unsafe recall$\uparrow$ & FP rate$\downarrow$ & Recall--FP$\uparrow$ \\
+\midrule
+Direct execution & \tbd & \tbd & \tbd \\
+Keyword guard & \tbd & \tbd & \tbd \\
+DB-GPT & \tbd & \tbd & \tbd \\
+DataMind hooks & \tbd & \tbd & \tbd \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Ablation and overhead}
 \label{sec:eval-overhead}
