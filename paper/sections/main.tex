@@ -555,11 +555,15 @@ Gold-hint/all & \tbd & \tbd & \tbd & \tbd & \tbd \\
 \end{tabular}
 \end{table}
 
-This table provides matched external comparisons: DB-GPT on Table/SQL and RAGFlow on document/RAG tasks. Unsupported combinations are reported as N/A rather than scored as failures.
+This table is also run on WorkSurface-Bench, but only on the supported
+matched subsets: DB-GPT on Table/SQL and RAGFlow on document/RAG tasks. All
+systems receive the same task IDs, workspace, model, questions, and output
+budget; unsupported combinations are reported as N/A rather than scored as
+failures.
 
 \begin{table}[t]
 \centering\footnotesize
-\caption{RQ1 matched-subset comparison with external systems.}
+\caption{RQ1 WorkSurface-Bench matched-subset comparison with external systems.}
 \label{tab:rq1-external}
 \resizebox{\linewidth}{!}{%
 \begin{tabular}{@{}llrrrrr@{}}

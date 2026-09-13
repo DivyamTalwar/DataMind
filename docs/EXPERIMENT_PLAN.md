@@ -44,7 +44,7 @@ DB-GPT 和 RAGFlow 必须参加它们能够支持且协议可对齐的子集：D
 
 条件包括 No-tool、Always-RAG、Naive-router、ReAct-all、DataMind-full 和 Gold-constrained（上界）。指标为 Route-F1、Evidence、Answer、Efficiency、tool/irrelevant/invalid calls、tokens 和 p95 latency，并按 RAG、Table、Graph、Cross-surface 分层。
 
-Table 2 是模型 × 条件主结果，Table 3 是任务类型，Table 4 是 matched-subset 外部系统：DB-GPT 对 Table/SQL，RAGFlow 对 document/RAG。RQ1 只研究问答质量和调用效率，不把故障处理混入主分数。
+Table 2 是模型 × 条件主结果，Table 3 是任务类型，Table 4 仍使用 WorkSurface-Bench，但只抽取可公平复现的 matched subset：DB-GPT 对 Table/SQL，RAGFlow 对 document/RAG。三者使用相同 task id、workspace、问题、模型和输出预算；RQ1 只研究问答质量和调用效率，不把故障处理混入主分数。
 
 ### Table 2–4：RQ1 serving quality
 
@@ -76,7 +76,7 @@ Table 2 是模型 × 条件主结果，Table 3 是任务类型，Table 4 是 mat
 
 这张表把 DataMind 与已有系统放在它们真正支持的任务子集上比较：DB-GPT 对 Table/SQL，RAGFlow 对 RAG/document。它说明 DataMind 的优势是否超出内部 baseline；不同系统不支持的任务不填 0，而填 N/A。
 
-**Table 4 — 外部系统 matched subset**
+**Table 4 — WorkSurface-Bench matched subset 外部比较**
 
 | System | Subset | Route-F1 | Evidence | Answer | p95 ms | Errors |
 |---|---|---:|---:|---:|---:|---:|
