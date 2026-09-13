@@ -15,6 +15,19 @@
 
 因此，在没有补齐实验 harness 前，不应把 smoke test 或单元测试写成论文结果。论文中的 RQ 表格只有在相应 adapter、driver 和 scorer 完成后才填入数字。
 
+## RQ 之间的代码耦合
+
+RQ1--RQ4 不需要做成一套统一的大型实验平台，可以由不同同学分别实现并直接产出自己的表格结果。它们共享的只有现有 DataMind runtime、模型配置、输入数据版本，以及结果中最基本的 task id、condition、answer、latency、tool trace 和 evidence 字段。
+
+| 实验 | 主要依赖 | 是否依赖其他 RQ |
+|---|---|---|
+| RQ1 | `benchmark/run.py`、WorkSurface-Bench adapter、serving scorer | 否 |
+| RQ2 | ingest/build service、WorkSurface-Build workspace、成本统计 | 否；构建出的数据可选地复用于 RQ1 |
+| RQ3 | `SnapshotStore`、`IngestLedger`、更新脚本、并发 driver | 否 |
+| RQ4 | parser/DB/Graph fault injection、结构化错误日志 | 否 |
+
+每位同学只需要负责自己的 driver、结果表和最小验证脚本。不要为了实验去重构 DataMind 核心；如果必须修改共享 runtime，先保持接口兼容，并在自己的 RQ 目录下记录所需配置。最终只需把四组已经生成的表格和图汇总到论文中。
+
 ## DataMind 和 DataMind-build
 
 **DataMind** 是面向 tool-using agent 的 workspace data plane。它把同一组原始文件组织成 document、table、graph、memory 等 surface，并在 serving 时通过 manifest、profile、snapshot、receipt 和 revision 管理这些数据。Serving Agent 读取的是一个明确的 profile snapshot，因此可以知道数据来自哪个版本、哪个 source，以及结果是否可审计；如果内置 live-only provider 已经无法满足这个 snapshot，运行时会 fail-closed，而不是返回混合版本结果。
