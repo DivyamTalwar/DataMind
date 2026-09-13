@@ -505,3 +505,82 @@ async def test_benchmark_checkpoints_and_resumes_without_duplicate_rows(tmp_path
     assert len(rows) == 2
     assert completed == {"1", "2"}
     assert exact_match("50", "5") is False
+
+
+class _LiveStore:
+    """Vector-store double with a silent dense side: constant embeddings make
+    vector scores meaningless, so retrieval quality rests entirely on the
+    BM25 cache — exactly where the stale-index bug lives."""
+
+    def __init__(self):
+        self.rows: dict[str, tuple[str, dict]] = {}
+        self.existing_count = 0
+
+    async def get_all_texts(self):
+        return [(item_id, text, meta) for item_id, (text, meta) in self.rows.items()]
+
+    async def add(self, ids, texts, embeddings, metadatas):
+        for item_id, text, meta in zip(ids, texts, metadatas):
+            self.rows[item_id] = (text, meta)
+        self.existing_count = len(self.rows)
+
+    async def query(self, vec, top_k=5, where=None):
+        return []  # dense side deliberately silent
+
+
+@pytest.mark.asyncio
+async def test_incremental_ingest_keeps_hybrid_lexical_search_fresh(tmp_path: Path):
+    """User-facing proof for #7: upload a file, then ask about it in the SAME
+    session — kb_search must see the new document immediately.
+
+    Without the after-commit lexical rebuild, the hybrid retriever's lazily
+    cached BM25 index never picks up the new chunks, so a search for the
+    freshly ingested content returns nothing until the process restarts.
+    (BM25 IDF needs a handful of docs to score positive and the default
+    tokeniser skips unigram extraction for CJK runs mixed with digits — the
+    corpus below is shaped around both properties.)
+    """
+    data_dir = tmp_path / "profile"
+    data_dir.mkdir()
+    store = _LiveStore()
+    retriever = HybridRetriever(
+        vector_store=store, embedding=_Embedding(),
+        vector_weight=0.0, bm25_weight=1.0,
+    )
+    service = KBService(
+        embedding=_Embedding(), vector_store=store, retriever=retriever,
+        data_dir=data_dir, retrieval_cfg=RetrievalConfig(),
+        manifest_path=tmp_path / "storage" / "kb_index_manifest.json",
+        manifest_base={"embedding_provider": "test", "embedding_model": "test-model", "dimension": 2},
+    )
+    # Session start: a few documents already indexed; the first search warms
+    # (and caches) the BM25 index — mirroring production warm-up.
+    await store.add(
+        ids=["old", "f1", "f2", "f3"],
+        texts=[
+            "苹果产量年度统计报告",
+            "香蕉批发价格行情",
+            "柑橘种植技术要点",
+            "葡萄冷藏运输规范",
+        ],
+        embeddings=[[1.0, 0.0]] * 4,
+        metadatas=[{"source": name} for name in ("old.md", "f1.md", "f2.md", "f3.md")],
+    )
+    warm = await service.search("苹果")
+    assert [hit["id"] for hit in warm] == ["old"]
+
+    # Incremental ingest of a newly uploaded file (what IngestService does
+    # per upload: embed + store.add + record_incremental_ingest).
+    await store.add(
+        ids=["new"],
+        texts=["星桥项目验收日期已定"],
+        embeddings=[[1.0, 0.0]],
+        metadatas=[{"source": "new.md"}],
+    )
+    await service.record_incremental_ingest()
+
+    fresh = await service.search("星桥项目 验收日期")
+    assert [hit["id"] for hit in fresh] == ["new"], (
+        "kb_search 对刚增量导入的文档返回空：BM25 缓存未重建，"
+        "新内容在进程重启前对检索不可见"
+    )
