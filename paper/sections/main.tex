@@ -277,33 +277,16 @@ corresponding ingestion path is DataMind-Build, shown in
 Figure~\ref{fig:datamind-build}; it is the Build Agent and its publication
 pipeline, not a second product or a different data model.
 
-\clearpage
-\onecolumn
-\begin{center}
-\includegraphics[width=0.84\textwidth]{figures/datamind_overview_v2.pdf}
-\captionof{figure}{DataMind serving path. The Serving Agent routes a request
-over profile-scoped document, database, graph, memory, and skill surfaces and
+\begin{figure*}[!b]
+\centering
+\includegraphics[width=0.94\textwidth]{figures/datamind_overview_v2.pdf}
+\caption{DataMind serving path. The Serving Agent routes a request over
+profile-scoped document, database, graph, memory, and skill surfaces and
 returns an answer with evidence. The profile, policy, revision, and receipt
 interfaces are shared with DataMind-Build.}
 \label{fig:datamind-overview}
-\end{center}
-
-\clearpage
-
-\begin{center}
-\includegraphics[width=0.84\textwidth]{figures/datamind_build_agent_generated.png}
-\captionof{figure}{DataMind-Build ingestion path. The Build Agent inventories
-a profile's workspace, plans surface candidates, parses and normalizes sources,
-projects records, validates candidate revisions, and publishes a profile
-snapshot. The candidate descriptor remains unpublished until validation; reads
-of touched surfaces are blocked during candidate assembly, and providers that
-do not support historical artifacts fail closed if a pinned request becomes
-stale.}
-\label{fig:datamind-build}
-\end{center}
-
-\clearpage
-\twocolumn
+\Description{DataMind architecture showing DataMind-Build materializing workspace artifacts into document, database, and graph surfaces, while the Serving Agent routes requests over a published profile snapshot that also includes runtime memory.}
+\end{figure*}
 
 \subsection{Workspace-to-surface materialization}
 \label{sec:build-agent}
@@ -338,6 +321,21 @@ surfaces so live-only providers cannot leak a partial candidate. The current
 prototype does not claim that every provider stages physical files
 transactionally; it reports an explicit failure when a live-only provider can
 no longer satisfy a pinned record.
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=0.94\textwidth]{figures/datamind_build_agent_generated.png}
+\caption{DataMind-Build ingestion path. The Build Agent inventories a profile's
+workspace, plans surface candidates, parses and normalizes sources, projects
+records, validates candidate revisions, and publishes a profile snapshot. The
+candidate descriptor remains unpublished until validation; reads of touched
+surfaces are blocked during candidate assembly, and providers that do not
+support historical artifacts fail closed if a pinned request becomes stale.}
+\label{fig:datamind-build}
+\Description{DataMind-Build pipeline from workspace sources through inspection,
+parsing, surface projection, validation and receipts, to publication of a
+profile snapshot consumed by the Serving Agent.}
+\end{figure*}
 
 \subsection{Surface-to-agent serving}
 \label{sec:serving-agent}
