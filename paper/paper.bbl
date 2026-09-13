@@ -2,7 +2,7 @@
 %%% Do NOT edit. File created by BibTeX with style
 %%% ACM-Reference-Format-Journals [18-Jan-2012].
 
-\begin{thebibliography}{19}
+\begin{thebibliography}{25}
 
 %%% ====================================================================
 %%% NOTE TO THE USER: you can override these defaults by providing
@@ -76,6 +76,18 @@
 \href{https://doi.org/10.14778/3750601.3750611}{doi:\nolinkurl{10.14778/3750601.3750611}}
 
 
+\bibitem[Chase and {LangChain Contributors}(2026)]%
+        {langchain2026retrieval}
+\bibfield{author}{\bibinfo{person}{Harrison Chase} {and}
+  \bibinfo{person}{{LangChain Contributors}}.} \bibinfo{year}{2026}\natexlab{}.
+\newblock \bibinfo{title}{{LangChain}: Retrieval Documentation}.
+\newblock
+  \bibinfo{howpublished}{\url{https://docs.langchain.com/oss/python/langchain/retrieval}}.
+\newblock
+\newblock
+\shownote{Accessed 2026-05-28}.
+
+
 \bibitem[Cheney et~al\mbox{.}(2009)]%
         {cheney2009provenance}
 \bibfield{author}{\bibinfo{person}{James Cheney}, \bibinfo{person}{Laura
@@ -87,6 +99,17 @@
   \bibinfo{pages}{379--474}.
 \newblock
 \href{https://doi.org/10.1561/1900000006}{doi:\nolinkurl{10.1561/1900000006}}
+
+
+\bibitem[{DB-GPT Contributors}(2026)]%
+        {dbgpt2026docs}
+\bibfield{author}{\bibinfo{person}{{DB-GPT Contributors}}.}
+  \bibinfo{year}{2026}\natexlab{}.
+\newblock \bibinfo{title}{{DB-GPT} Documentation}.
+\newblock \bibinfo{howpublished}{\url{https://docs.dbgpt.cn/docs/overview/}}.
+\newblock
+\newblock
+\shownote{Accessed 2026-05-28}.
 
 
 \bibitem[Edge et~al\mbox{.}(2024)]%
@@ -114,6 +137,18 @@
   \bibinfo{pages}{31--40}.
 \newblock
 \href{https://doi.org/10.1145/1265530.1265535}{doi:\nolinkurl{10.1145/1265530.1265535}}
+
+
+\bibitem[{InfiniFlow}(2026)]%
+        {ragflow2026}
+\bibfield{author}{\bibinfo{person}{{InfiniFlow}}.}
+  \bibinfo{year}{2026}\natexlab{}.
+\newblock \bibinfo{title}{{RAGFlow}: Open-source {RAG} Engine Based on Deep
+  Document Understanding}.
+\newblock \bibinfo{howpublished}{\url{https://github.com/infiniflow/ragflow}}.
+\newblock
+\newblock
+\shownote{Accessed 2026-05-28}.
 
 
 \bibitem[Jiang et~al\mbox{.}(2025)]%
@@ -167,6 +202,31 @@
 \tempurl}
 
 
+\bibitem[{LangChain AI}(2024)]%
+        {langgraph2024}
+\bibfield{author}{\bibinfo{person}{{LangChain AI}}.}
+  \bibinfo{year}{2024}\natexlab{}.
+\newblock \bibinfo{title}{{LangGraph}: Building Stateful, Multi-Actor
+  Applications with {LLMs}}.
+\newblock
+  \bibinfo{howpublished}{\url{https://github.com/langchain-ai/langgraph}}.
+\newblock
+\newblock
+\shownote{GitHub repository; accessed 2026-05-28}.
+
+
+\bibitem[{LangGenius}(2026)]%
+        {dify2026}
+\bibfield{author}{\bibinfo{person}{{LangGenius}}.}
+  \bibinfo{year}{2026}\natexlab{}.
+\newblock \bibinfo{title}{{Dify}: Production-ready Platform for Agentic
+  Workflow Development}.
+\newblock \bibinfo{howpublished}{\url{https://github.com/langgenius/dify}}.
+\newblock
+\newblock
+\shownote{Accessed 2026-05-28}.
+
+
 \bibitem[Lewis et~al\mbox{.}(2020)]%
         {lewis2020rag}
 \bibfield{author}{\bibinfo{person}{Patrick Lewis}, \bibinfo{person}{Ethan
@@ -194,6 +254,19 @@
 \newblock \bibinfo{howpublished}{\url{https://arxiv.org/abs/2607.25765}}.
 \newblock
 \showeprint[arxiv]{2607.25765}~[cs.DB]
+
+
+\bibitem[{Mintplex Labs}(2026)]%
+        {anythingllm2026}
+\bibfield{author}{\bibinfo{person}{{Mintplex Labs}}.}
+  \bibinfo{year}{2026}\natexlab{}.
+\newblock \bibinfo{title}{{AnythingLLM}: All-in-one {AI} Application for Local
+  {LLMs}, {RAG}, and Agents}.
+\newblock
+  \bibinfo{howpublished}{\url{https://github.com/Mintplex-Labs/anything-llm}}.
+\newblock
+\newblock
+\shownote{Accessed 2026-05-28}.
 
 
 \bibitem[Packer et~al\mbox{.}(2023)]%

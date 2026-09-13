@@ -68,6 +68,8 @@ RQ1--RQ4 不需要做成一套统一的大型实验平台，可以由不同同�
 
 **运行：** 四个模型运行 ReAct-all、Naive-router、DataMind-full、Gold-constrained、Gold-hint/all；同时复现 No-tool 和 Always-RAG。分别报告 RAG、Table、Graph、Cross-surface。
 
+**外部系统对比：** 保留 DB-GPT 和 RAGFlow，但只在它们真正支持且能使用相同模型、相同数据、相同问题和相同输出预算的任务子集上比较。DB-GPT 主要作为 database/structured subset 的端到端基线；RAGFlow 主要作为 document/RAG subset 的基线。不要把只支持单一 surface 的系统与 DataMind 在 Cross-surface 上的总分直接比较。若部署版本、模型或数据处理链无法对齐，则只保留论文 Table 1 的定性能力矩阵和系统说明，不填入定量主表。
+
 **指标：** Route Precision/Recall/F1、Evidence、Answer、Efficiency、tool calls、irrelevant calls、invalid calls、tokens、p50/p95 latency。receipt completeness 只保留在原始 trace 中，不作为 RQ1 主结果。
 
 **Table RQ1-A：主结果**
@@ -82,6 +84,14 @@ RQ1--RQ4 不需要做成一套统一的大型实验平台，可以由不同同�
 | Gemini-3.1-Pro | DataMind-full |  |  |  |  |  |  |
 | GPT-5.5 | ReAct-all |  |  |  |  |  |  |
 | GPT-5.5 | DataMind-full |  |  |  |  |  |  |
+
+**Table RQ1-C：外部系统匹配子集（可选）**
+
+| System | Matched subset | Route-F1 | Evidence | Answer | p95 Latency | Errors |
+|---|---|---:|---:|---:|---:|---:|
+| DB-GPT | Table/SQL |  |  |  |  |  |
+| RAGFlow | RAG/document |  |  |  |  |  |
+| DataMind-full | Same subset |  |  |  |  |  |
 
 **Table RQ1-B：按任务类型**
 

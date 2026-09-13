@@ -25,7 +25,9 @@ communities~\cite{edge2024graphrag}, but neither representation says whether a
 database view was built from the same source revision. A text-to-SQL agent can
 execute a query, while systems such as DB-GPT and SiriusBI focus on natural
 language interaction with particular database or business-intelligence
-workloads~\cite{xue2024dbgpt,jiang2025siriusbi}. They do not provide a policy
+workloads~\cite{xue2024dbgpt,jiang2025siriusbi}; document-centric platforms such
+as RAGFlow focus on document parsing and retrieval~\cite{ragflow2026}. They do
+not provide a policy
 for combining a table result with a document assertion or a dependency edge.
 A graph retriever can expose relationships, but it does not determine whether
 the graph is stale while the corresponding files are being edited. Existing
@@ -442,6 +444,15 @@ Gemini-3.1-Pro, and GPT-5.5); the DataMind build and dynamic-system studies
 fix GPT-5.5 to isolate data-plane effects. We report repeated-run means and
 confidence intervals rather than a single trajectory.
 
+We additionally retain the two external systems from the earlier report as
+matched-subset baselines. DB-GPT is evaluated on database and structured-query
+tasks, and RAGFlow on document/RAG tasks, using the same model, source files,
+questions, prompt budget, and decoding settings as DataMind. They are not
+assigned a score on graph or cross-surface tasks that their deployment does not
+support. If a released version cannot be run under these controls, we report
+the capability comparison in Table~\ref{tab:positioning} and omit a numerical
+claim rather than conflate system coverage with answer quality.
+
 \subsection{RQ1: Serving quality and efficiency}
 \label{sec:eval-rq1}
 
@@ -609,6 +620,44 @@ source lineage, derivation, and replay~\cite{cheney2009provenance,green2007prove
 DataMind's challenge is to carry those ideas across vector retrieval, SQL,
 graph traversal, and memory operations while exposing enough metadata for a
 language model to select an operation.
+
+Table~\ref{tab:positioning} summarizes the qualitative positioning that
+motivates the comparison set. It is a capability matrix, rather than an
+accuracy result. DB-GPT and RAGFlow are therefore retained as external
+baselines only on task subsets that their released systems support; quantitative
+comparisons use the same model, inputs, prompts, and output budget. A partial
+or unsupported capability is not treated as a failed answer on a workload that
+the system was not designed to serve.
+
+\begin{table}[t]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3.2pt}
+\renewcommand{\arraystretch}{1.12}
+\caption{Qualitative positioning against representative data and agent
+systems. A check mark denotes first-class support, $\sim$ partial or
+product-specific support, and a cross a missing support or a non-goal.}
+\label{tab:positioning}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}l*{10}{c}@{}}
+\toprule
+\textbf{System} & \textbf{Profile} & \textbf{Docs} & \textbf{SQL}
+& \textbf{Graph} & \textbf{Memory} & \textbf{Wiki} & \textbf{Update}
+& \textbf{Pipeline} & \textbf{IDE} & \textbf{Guards} \\
+\midrule
+DB-GPT~\cite{xue2024dbgpt,dbgpt2026docs} & $\sim$ & \cmark & \cmark & \cmark & $\sim$ & \xmark & $\sim$ & $\sim$ & $\sim$ & $\sim$ \\
+RAGFlow~\cite{ragflow2026} & $\sim$ & \cmark & $\sim$ & \cmark & \cmark & \xmark & \cmark & $\sim$ & $\sim$ & $\sim$ \\
+Dify~\cite{dify2026} & $\sim$ & \cmark & $\sim$ & \xmark & $\sim$ & \xmark & \cmark & $\sim$ & $\sim$ & $\sim$ \\
+AnythingLLM~\cite{anythingllm2026} & $\sim$ & \cmark & \cmark & \xmark & \cmark & \xmark & $\sim$ & $\sim$ & \xmark & \xmark \\
+\addlinespace[1pt]
+LangChain~\cite{langchain2026retrieval} & \xmark & $\sim$ & $\sim$ & $\sim$ & $\sim$ & \xmark & \xmark & \xmark & \xmark & $\sim$ \\
+LangGraph~\cite{langgraph2024} & \xmark & \xmark & \xmark & \xmark & \cmark & \xmark & \xmark & \xmark & \xmark & \cmark \\
+\addlinespace[1pt]
+\rowcolor{green!8}
+\textbf{DataMind} & \cmark & \cmark & \cmark & \cmark & \cmark & \cmark & \cmark & $\sim$ & \cmark & \cmark \\
+\bottomrule
+\end{tabular}}
+\end{table}
 
 \section{Conclusion}
 \label{sec:conclusion}
