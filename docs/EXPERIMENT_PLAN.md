@@ -48,6 +48,8 @@ Table 2 是模型 × 条件主结果，Table 3 是任务类型，Table 4 是 mat
 
 ### Table 2–4：RQ1 serving quality
 
+这张表回答 RQ1 的主问题：在相同任务和 built workspace 上，DataMind-full 是否比 ReAct-all 提高路由、证据、答案和工具效率。横向比较不同模型，纵向比较两种 serving 条件；若 Answer 提升同时 Tokens/p95 降低，说明收益来自 surface-aware serving，而不是单纯模型差异。
+
 **Table 2 — 主结果（每个模型至少 ReAct-all/DataMind-full）**
 
 | Model | Condition | Route-F1↑ | Evidence↑ | Answer↑ | Efficiency↑ | Tokens↓ | p95 ms↓ |
@@ -61,6 +63,8 @@ Table 2 是模型 × 条件主结果，Table 3 是任务类型，Table 4 是 mat
 | GPT-5.5 | ReAct-all | TBD | TBD | TBD | TBD | TBD | TBD |
 | GPT-5.5 | DataMind-full | TBD | TBD | TBD | TBD | TBD | TBD |
 
+这张表检查 RQ1 的收益来自哪类 surface。它比较 ReAct-all、Naive-router、DataMind-full 和 Gold-hint/all 在 RAG、Table、Graph、Cross-surface 任务上的表现，用来判断 DataMind 是否真正解决跨 surface 路由，而不是只在文档问答上获益。
+
 **Table 3 — 按任务类型**
 
 | Condition | RAG Answer | Table Answer | Graph Answer | Cross Answer | Evidence |
@@ -69,6 +73,8 @@ Table 2 是模型 × 条件主结果，Table 3 是任务类型，Table 4 是 mat
 | Naive-router | TBD | TBD | TBD | TBD | TBD |
 | DataMind-full | TBD | TBD | TBD | TBD | TBD |
 | Gold-hint/all | TBD | TBD | TBD | TBD | TBD |
+
+这张表把 DataMind 与已有系统放在它们真正支持的任务子集上比较：DB-GPT 对 Table/SQL，RAGFlow 对 RAG/document。它说明 DataMind 的优势是否超出内部 baseline；不同系统不支持的任务不填 0，而填 N/A。
 
 **Table 4 — 外部系统 matched subset**
 
@@ -93,6 +99,8 @@ Table 2 是模型 × 条件主结果，Table 3 是任务类型，Table 4 是 mat
 
 ### Table 5–7：RQ2 build cost
 
+这张表回答 RQ2 的第一部分：构建不同 surface 需要多少时间、调用、存储和验证成本，以及覆盖率和 provenance 是否完整。比较单 surface、Eager-all、Heuristic-demand 与 DataMind-build，用来说明 DataMind 的入库代价及其数据质量。
+
 **Table 5 — 构建成本和覆盖率**
 
 | Strategy | Time s↓ | API calls↓ | Storage MB↓ | Coverage↑ | Provenance↑ | Validation failures↓ |
@@ -104,6 +112,8 @@ Table 2 是模型 × 条件主结果，Table 3 是任务类型，Table 4 是 mat
 | Heuristic-demand | TBD | TBD | TBD | TBD | TBD | TBD |
 | DataMind-build | TBD | TBD | TBD | TBD | TBD | TBD |
 
+这张表回答 RQ2 的第二部分：不同构建策略产生的数据，是否真的改善后续 Serving。所有策略由同一个 Worker 在相同任务上回答；Answer/Evidence/Efficiency 与 Cost/query 一起决定多 surface 构建是否值得。
+
 **Table 6 — 构建后的 serving value**
 
 | Strategy | N | Answer | Evidence | Efficiency | p95 ms | Cost/query |
@@ -111,6 +121,8 @@ Table 2 是模型 × 条件主结果，Table 3 是任务类型，Table 4 是 mat
 | Document-only | 100 | TBD | TBD | TBD | TBD | TBD |
 | Eager-all | 100 | TBD | TBD | TBD | TBD | TBD |
 | DataMind-build | 100 | TBD | TBD | TBD | TBD | TBD |
+
+这张表是构建组件诊断，不是新的主 RQ。它比较 chunker 和 embedder 对检索质量的影响，帮助解释 Table 5/6 的构建质量来源；旧数字只有在配置完全一致时才能复用。
 
 **Table 7 — 旧 report 的 ingestion diagnostic（必须重跑）**
 
@@ -128,11 +140,13 @@ Table 2 是模型 × 条件主结果，Table 3 是任务类型，Table 4 是 mat
 
 - **DataMind no-hooks**：保留完整 serving path，关闭 PathAllowlist、DestructiveSQL 和 AuditLog hooks；
 - **DataMind full**：默认配置，启用 hooks、evidence 和审计路径；
-- **DB-GPT/RAGFlow（可选）**：仅在模型、数据、问题和输出协议完全匹配时加入。
+- **DB-GPT/RAGFlow（matched subset，必须）**：DB-GPT 对 Table/SQL，RAGFlow 对 RAG/document；协议不支持的单元格填 N/A。
 
 并发度为 `1,5,20,50,100`，每条件 60 或 200 tasks，至少三次。报告 errors、p50/p95/p99、QPS、peak RSS、tool/model/hooks latency breakdown 和 tokens。Table 8 是 runtime 主表；旧单并发数字只作 pilot。
 
 ### Table 8：RQ3 serving efficiency
+
+这张表回答 RQ3：DataMind 的 serving 管理路径带来多少系统开销。比较 no-hooks、full 和匹配的外部系统，在相同任务集上观察并发升高时的延迟、QPS、RSS 和错误率；它不衡量答案质量。
 
 **Table 8 — 并发、延迟、吞吐和内存**
 
@@ -157,6 +171,8 @@ Table 9 是统一 fault matrix；Table 10 是旧 recovery pilot；Table 11 是 p
 
 ### Table 9–12：RQ4 component stability
 
+这张表回答 RQ4 的核心问题：组件挂掉时，系统是否按预期 fallback、retry、structured error 或 block。每种事件比较 Direct mutable、DataMind-full 以及可匹配的 DB-GPT/RAGFlow，结果用于区分“稳定失败”与“返回错误答案”。
+
 **Table 9 — 统一故障矩阵**
 
 | Event | System | Completion | Answer | Auditable | Structured error | Fallback/block | Recovery ms |
@@ -170,6 +186,8 @@ Table 9 是统一 fault matrix；Table 10 是旧 recovery pilot；Table 11 是 p
 | Graph unavailable | Direct mutable | TBD | TBD | TBD | TBD | TBD | TBD |
 | Graph unavailable | DataMind-full | TBD | TBD | TBD | TBD | TBD | TBD |
 
+这张表保留旧 report 的总体 recovery 结果，作为 RQ4 的历史 pilot。它比较 Fixed pipeline 与 DataMind live 在 KB、Graph、DB 和 corruption 故障下的恢复率；正式结果必须用当前的 evidence 和正确性判定重跑。
+
 **Table 10 — 旧 report recovery pilot（按新判定重跑）**
 
 | System | KB empty | Graph down | DB timeout | Partial corruption | Overall |
@@ -177,12 +195,16 @@ Table 9 是统一 fault matrix；Table 10 是旧 recovery pilot；Table 11 是 p
 | Fixed pipeline | 0.0% (0) | 0.0% (0) | 0.0% (0) | 0.0% (0) | 0.0% (0) |
 | DataMind live | 60.0% (3) | 60.7% (17) | 70.6% (12) | 62.5% (25) | 63.3% (57) |
 
+这张表验证 RQ4 的隔离稳定性。比较 Flat namespace 与 DataMind three-scope 的记忆泄漏、答案泄漏和召回率；理想结果是泄漏为 0、合法记忆召回为 100%。
+
 **Table 11 — profile/memory isolation**
 
 | Setting | Memory leakage↓ | Memory recall↑ | Answer leakage↓ | Answer recall↑ | Mixed answer↓ |
 |---|---:|---:|---:|---:|---:|
 | Flat namespace | 30% | 70% | 68% | 31% | 63% |
 | DataMind three-scope | 0% | 100% | 0% | 100% | 0% |
+
+这张表验证 RQ4 的 SQL 安全边界。比较直接执行、关键词 guard、DB-GPT 和 DataMind hooks 对危险 SQL 的召回与误报，说明系统能否拦住危险操作而不过度阻断安全查询。
 
 **Table 12 — SQL policy safety**
 

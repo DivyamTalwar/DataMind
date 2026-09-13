@@ -511,6 +511,8 @@ score and measured separately in RQ4. If the full system improves answer
 quality but increases unnecessary exploration, the additional tool and token
 measurements make that trade-off explicit.
 
+This table is the primary RQ1 comparison. It contrasts ReAct-all with DataMind-full for each model, showing whether surface-aware serving improves quality and tool efficiency under the same tasks.
+
 \begin{table*}[t]
 \centering\footnotesize
 \setlength{\tabcolsep}{3.5pt}
@@ -535,6 +537,8 @@ GPT-5.5 & DataMind-full & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 \end{tabular}}
 \end{table*}
 
+This table localizes the RQ1 effect by task type. It shows whether gains hold for document, table, graph, and cross-surface questions rather than only for the easiest document cases.
+
 \begin{table}[t]
 \centering\footnotesize
 \caption{RQ1 answer quality by WorkSurface-Bench task type.}
@@ -550,6 +554,8 @@ Gold-hint/all & \tbd & \tbd & \tbd & \tbd & \tbd \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+This table provides matched external comparisons: DB-GPT on Table/SQL and RAGFlow on document/RAG tasks. Unsupported combinations are reported as N/A rather than scored as failures.
 
 \begin{table}[t]
 \centering\footnotesize
@@ -592,6 +598,8 @@ aggregate score. This is the experiment that connects WorkSurface-Build to the
 DataMind claim: materialization is useful only when its cost produces durable
 serving value.
 
+This table measures the cost and coverage of each Build Agent strategy. It separates the cost of materializing surfaces from the quality of the later Serving Agent.
+
 \begin{table*}[t]
 \centering\footnotesize
 \setlength{\tabcolsep}{3.5pt}
@@ -614,6 +622,8 @@ DataMind-build & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 \end{tabular}}
 \end{table*}
 
+This table tests whether the build cost produces downstream value. The same Worker answers the same tasks from each strategy's built surfaces, enabling a cost--quality comparison.
+
 \begin{table}[t]
 \centering\footnotesize
 \caption{RQ2 downstream serving value after materialization.}
@@ -629,6 +639,8 @@ DataMind-build & 100 & \tbd & \tbd & \tbd & \tbd & \tbd \\
 \bottomrule
 \end{tabular}}
 \end{table}
+
+This diagnostic table isolates the effect of ingestion components. It compares chunkers and embedders so that retrieval differences are not misattributed to the overall build strategy.
 
 \begin{table}[t]
 \centering\footnotesize
@@ -665,6 +677,8 @@ three repetitions per condition. We report errors, p50/p95/p99 end-to-end
 latency, QPS, peak RSS, tool calls, tokens, and model/tool/hook latency
 breakdowns. This isolates the cost of DataMind's serving and management path
 without confusing it with answer-quality differences.
+
+This table is the RQ3 efficiency result. It compares DataMind no-hooks, DataMind full, and matched external systems as concurrency increases, reporting latency, throughput, memory, and errors.
 
 \begin{table*}[t]
 \centering\footnotesize
@@ -710,6 +724,8 @@ recovery time, and unsafe answer or execution rate. A recovery is successful
 only when the task requirement and evidence requirement are both met; a lucky
 answer after a component failure is not stability.
 
+This table is the main RQ4 stability matrix. For each injected component failure, it compares the expected fallback or error behavior and distinguishes safe failure from an incorrect answer.
+
 \begin{table*}[t]
 \centering\footnotesize
 \setlength{\tabcolsep}{6pt}
@@ -734,6 +750,8 @@ Graph unavailable & DataMind-full & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 \end{tabular}}
 \end{table*}
 
+This table records the earlier recovery pilot for reference. Its values are replaced by the unified RQ4 protocol before serving as primary evidence.
+
 \begin{table*}[t]
 \centering\footnotesize
 \setlength{\tabcolsep}{3pt}
@@ -757,6 +775,8 @@ The following two diagnostics preserve the earlier report's scope-isolation
 and tool-policy experiments. They are reported as correctness checks rather
 than as additional claims about the serving quality benchmark.
 
+This diagnostic tests profile and memory isolation under RQ4. It compares a flat namespace with DataMind scopes using leakage and legitimate recall.
+
 \begin{table*}[t]
 \centering\footnotesize
 \caption{Pilot profile-scoped memory isolation diagnostic from the earlier
@@ -774,6 +794,8 @@ DataMind three-scope & 0\% & 100\% & 0\% & 100\% & 0\% \\
 \bottomrule
 \end{tabular}}
 \end{table*}
+
+This diagnostic tests SQL policy stability under RQ4. It compares unsafe-operation recall against false positives for direct execution, simple guards, DB-GPT, and DataMind hooks.
 
 \begin{table}[t]
 \centering\footnotesize
