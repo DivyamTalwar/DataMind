@@ -452,15 +452,13 @@ analysis separates single-surface and cross-surface tasks. This distinction
 prevents a system from appearing efficient merely because it avoids the hard
 cases that require evidence from more than one surface.
 
-The static serving ablation removes surface manifests and evidence receipts one
-at a time. Snapshot publication and parser fallback are evaluated in the
-dynamic update and fault-injection experiments, respectively, because a static
-benchmark with one valid revision and no injected failures cannot identify
-their effects. If the full system improves only answer quality but increases
-unnecessary exploration, the additional tool and token measurements make that
-trade-off explicit. If the same quality is achieved by the simple manifest
-router, the result identifies which parts of DataMind still need a stronger
-planner rather than attributing all gains to the data-plane abstraction.
+RQ1 reports serving quality, routing behavior, evidence coverage, and runtime
+cost under a fixed single-version workspace. Snapshot publication and parser
+fallback are evaluated in the dynamic update and fault-injection experiments,
+respectively, because a static benchmark with one valid revision and no
+injected failures cannot identify their effects. If the full system improves
+answer quality but increases unnecessary exploration, the additional tool and
+token measurements make that trade-off explicit.
 
 \subsection{RQ2: Build cost and amortization}
 \label{sec:eval-rq2}

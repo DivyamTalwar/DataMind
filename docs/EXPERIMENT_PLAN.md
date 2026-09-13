@@ -68,7 +68,7 @@ RQ1--RQ4 不需要做成一套统一的大型实验平台，可以由不同同�
 
 **运行：** 四个模型运行 ReAct-all、Naive-router、DataMind-full、Gold-constrained、Gold-hint/all；同时复现 No-tool 和 Always-RAG。分别报告 RAG、Table、Graph、Cross-surface。
 
-**指标：** Route Precision/Recall/F1、Evidence、Answer、Efficiency、tool calls、irrelevant calls、invalid calls、tokens、p50/p95 latency、receipt completeness。
+**指标：** Route Precision/Recall/F1、Evidence、Answer、Efficiency、tool calls、irrelevant calls、invalid calls、tokens、p50/p95 latency。receipt completeness 只保留在原始 trace 中，不作为 RQ1 主结果。
 
 **Table RQ1-A：主结果**
 
@@ -91,33 +91,6 @@ RQ1--RQ4 不需要做成一套统一的大型实验平台，可以由不同同�
 | Naive-router |  |  |  |  |  |
 | DataMind-full |  |  |  |  |  |
 | Gold-hint/all |  |  |  |  |  |
-
-**Table RQ1-C：消融**
-
-RQ1 的静态 benchmark 只能可靠测出 manifest 和 evidence receipt。snapshot
-只有在数据存在多个 revision 时才有作用，fallback 只有在 backend 故障时才有
-作用，因此二者分别放到 RQ3 和 RQ4；不要在静态 RQ1 中把它们当成有效消融。
-
-- **manifest**：surface 的能力描述，包括 schema、可用 operation、source
-  范围、freshness、evidence 类型和 cost。移除后，模型只能看到通用工具，
-  不能先按能力筛选 surface。主要观察 Route-F1、irrelevant calls 和 tokens。
-- **receipt**：每次读写返回的 source、locator、profile、revision 和
-  receipt ID。移除后仍可返回值，但没有可审计的来源链。除 benchmark 的
-  Evidence 外，必须额外报告 auditable-evidence/receipt completeness，
-  否则标准 Evidence 可能无法体现 receipt 的差异。
-- **snapshot**：请求绑定的 profile revision 向量；候选正在更新某个 surface
-  时阻断该 surface 的读取，已发布版本被请求 supersede 后对 live-only
-  provider fail-closed。当前实现不提供旧 artifact 的历史读取。只在 RQ3
-  的 add/modify/delete 和并发实验中比较。
-- **fallback**：当前实现只对 PDF/office 解析提供 MinerU API 到 pypdf 的确定性
-  fallback。surface 故障不会自动切换到另一个 surface；运行时会返回结构化错误，
-  由模型决定是否发起另一工具调用。只在 RQ4 fault injection 中比较。
-
-| Variant | Route-F1 | Evidence | Answer | Invalid Calls | Tokens | Receipt Completeness |
-|---|---:|---:|---:|---:|---:|---:|
-| DataMind-full |  |  |  |  |  |  |
-| − manifest |  |  |  |  |  |  |
-| − receipt |  |  |  |  |  |  |
 
 **图：**
 
