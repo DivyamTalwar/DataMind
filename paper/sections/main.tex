@@ -117,6 +117,42 @@ This paper makes three contributions:
   the data-system costs and correctness properties that support it.
 \end{itemize}
 
+Table~\ref{tab:positioning} summarizes the qualitative positioning that
+motivates the comparison set. It is a capability matrix, rather than an
+accuracy result. DB-GPT and RAGFlow are retained as external baselines only on
+task subsets that their released systems support; quantitative comparisons use
+the same model, inputs, prompts, and output budget.
+
+\begin{table*}[t]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{6pt}
+\renewcommand{\arraystretch}{1.12}
+\caption{Qualitative positioning against representative data and agent
+systems. A check mark denotes first-class support, $\sim$ partial or
+product-specific support, and a cross a missing support or a non-goal.}
+\label{tab:positioning}
+\resizebox{0.86\textwidth}{!}{%
+\begin{tabular}{@{}l*{10}{c}@{}}
+\toprule
+\textbf{System} & \textbf{Profile} & \textbf{Docs} & \textbf{SQL}
+& \textbf{Graph} & \textbf{Memory} & \textbf{Wiki} & \textbf{Update}
+& \textbf{Pipeline} & \textbf{IDE} & \textbf{Guards} \\
+\midrule
+DB-GPT~\cite{xue2024dbgpt,dbgpt2026docs} & $\sim$ & \cmark & \cmark & \cmark & $\sim$ & \xmark & $\sim$ & $\sim$ & $\sim$ & $\sim$ \\
+RAGFlow~\cite{ragflow2026} & $\sim$ & \cmark & $\sim$ & \cmark & \cmark & \xmark & \cmark & $\sim$ & $\sim$ & $\sim$ \\
+Dify~\cite{dify2026} & $\sim$ & \cmark & $\sim$ & \xmark & $\sim$ & \xmark & \cmark & $\sim$ & $\sim$ & $\sim$ \\
+AnythingLLM~\cite{anythingllm2026} & $\sim$ & \cmark & \cmark & \xmark & \cmark & \xmark & $\sim$ & $\sim$ & \xmark & \xmark \\
+\addlinespace[1pt]
+LangChain~\cite{langchain2026retrieval} & \xmark & $\sim$ & $\sim$ & $\sim$ & $\sim$ & \xmark & \xmark & \xmark & \xmark & $\sim$ \\
+LangGraph~\cite{langgraph2024} & \xmark & \xmark & \xmark & \xmark & \cmark & \xmark & \xmark & \xmark & \xmark & \cmark \\
+\addlinespace[1pt]
+\rowcolor{green!8}
+\textbf{DataMind} & \cmark & \cmark & \cmark & \cmark & \cmark & \cmark & \cmark & $\sim$ & \cmark & \cmark \\
+\bottomrule
+\end{tabular}}
+\end{table*}
+
 \section{Problem Setting}
 \label{sec:problem}
 
@@ -589,18 +625,19 @@ DataMind-build & 100 & \tbd & \tbd & \tbd & \tbd & \tbd \\
 
 \begin{table}[t]
 \centering\footnotesize
-\caption{Optional ingestion component sensitivity inherited from the earlier
-report. The table is filled only when the same corpus and scorer are used.}
+\caption{Pilot ingestion component sensitivity from the earlier report on its
+MS MARCO subset. These values must be rerun before being used as a primary
+WorkSurface-Build result.}
 \label{tab:rq2-ingest}
 \begin{tabular}{@{}lllrrr@{}}
 \toprule
 System & Chunker & Embedder & NDCG@10$\uparrow$ & Recall@10$\uparrow$ & MRR$\uparrow$ \\
 \midrule
-DataMind auto & built-in & \tbd & \tbd & \tbd & \tbd \\
-DataMind BYOP & sentence & \tbd & \tbd & \tbd & \tbd \\
-DataMind BYOP & sentence & \tbd & \tbd & \tbd & \tbd \\
-DataMind BYOP & sentence & \tbd & \tbd & \tbd & \tbd \\
-DB-GPT & built-in & \tbd & \tbd & \tbd & \tbd \\
+DataMind auto & built-in & Qwen v2 & 0.9625 & 0.9920 & 0.9533 \\
+DataMind BYOP & sentence & Qwen v2 & 0.9641 & 0.9960 & 0.9543 \\
+DataMind BYOP & sentence & Qwen v3 & 0.9859 & 0.9960 & 0.9828 \\
+DataMind BYOP & sentence & Qwen v4 & 0.9861 & 1.0000 & 0.9814 \\
+DB-GPT & built-in & Qwen v4 & 0.9834 & 0.9980 & 0.9785 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -629,20 +666,22 @@ holding model behavior constant.
 \begin{table}[t]
 \centering\footnotesize
 \setlength{\tabcolsep}{3.5pt}
-\caption{RQ3 end-to-end latency, throughput, and memory under concurrency.}
+\caption{RQ3 end-to-end latency, throughput, and memory under concurrency.
+Concurrency-one values are the pilot measurements from the earlier report;
+the remaining rows are reserved for the controlled rerun.}
 \label{tab:rq3-runtime}
 \resizebox{\linewidth}{!}{%
 \begin{tabular}{@{}llrrrrrrr@{}}
 \toprule
 System & Concurrency & $N$ & Errors$\downarrow$ & p50 ms$\downarrow$ & p95 ms$\downarrow$ & p99 ms$\downarrow$ & QPS$\uparrow$ & Peak RSS MB$\downarrow$ \\
 \midrule
-DataMind no-hooks & 1 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
-DataMind full & 1 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+DataMind no-hooks & 1 & 60 & 2 & 9373.8 & 18329.4 & 24302.7 & 0.0917 & 193.5 \\
+DataMind full & 1 & 60 & 2 & 8458.0 & 15413.4 & 19560.0 & 0.1012 & 188.1 \\
 DataMind no-hooks & 20 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 DataMind full & 20 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 DataMind no-hooks & 100 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 DataMind full & 100 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
-DB-GPT (optional) & 1 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+DB-GPT (optional) & 1 & 60 & 0 & 7164.1 & 11660.2 & 13839.5 & 0.1297 & 194.0 \\
 \bottomrule
 \end{tabular}}
 \end{table}
@@ -689,38 +728,56 @@ Graph unavailable & DataMind-full & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 \end{tabular}}
 \end{table}
 
+\begin{table}[t]
+\centering\footnotesize
+\setlength{\tabcolsep}{3pt}
+\caption{Pilot recovery results from the earlier report. The denominator is
+the affected recoverable slice for each injected fault.}
+\label{tab:rq4-recovery-pilot}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+System & KB empty & Graph down & DB timeout & Partial corruption & Overall \\
+\midrule
+Fixed pipeline & 0.0\% (0) & 0.0\% (0) & 0.0\% (0) & 0.0\% (0) & 0.0\% (0) \\
+DataMind live & 60.0\% (3) & 60.7\% (17) & 70.6\% (12) & 62.5\% (25) & 63.3\% (57) \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
 The following two diagnostics preserve the earlier report's scope-isolation
 and tool-policy experiments. They are reported as correctness checks rather
 than as additional claims about the serving quality benchmark.
 
 \begin{table}[t]
 \centering\footnotesize
-\caption{Profile-scoped memory isolation diagnostic.}
+\caption{Pilot profile-scoped memory isolation diagnostic from the earlier
+report.}
 \label{tab:rq4-memory}
 \resizebox{\linewidth}{!}{%
 \begin{tabular}{@{}lrrrrr@{}}
 \toprule
 Setting & Memory leakage$\downarrow$ & Memory recall$\uparrow$ & Answer leakage$\downarrow$ & Answer recall$\uparrow$ & Mixed answer$\downarrow$ \\
 \midrule
-Flat namespace & \tbd & \tbd & \tbd & \tbd & \tbd \\
-DataMind three-scope & \tbd & \tbd & \tbd & \tbd & \tbd \\
+Flat namespace & 30\% & 70\% & 68\% & 31\% & 63\% \\
+DataMind three-scope & 0\% & 100\% & 0\% & 100\% & 0\% \\
 \bottomrule
 \end{tabular}}
 \end{table}
 
 \begin{table}[t]
 \centering\footnotesize
-\caption{Tool-dispatch SQL policy diagnostic. Ask-user decisions count as
-blocked until confirmation.}
+\caption{Pilot tool-dispatch SQL policy diagnostic from the earlier report.
+Ask-user decisions count as blocked until confirmation.}
 \label{tab:rq4-policy}
 \begin{tabular}{@{}lrrr@{}}
 \toprule
 System & Unsafe recall$\uparrow$ & FP rate$\downarrow$ & Recall--FP$\uparrow$ \\
 \midrule
-Direct execution & \tbd & \tbd & \tbd \\
-Keyword guard & \tbd & \tbd & \tbd \\
-DB-GPT & \tbd & \tbd & \tbd \\
-DataMind hooks & \tbd & \tbd & \tbd \\
+Direct execution & 0\% & 0\% & 0\% \\
+Keyword guard & 8\% & 0\% & 8\% \\
+DB-GPT & 82\% & 56\% & 26\% \\
+DataMind hooks & 100\% & 0\% & 100\% \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -807,44 +864,6 @@ source lineage, derivation, and replay~\cite{cheney2009provenance,green2007prove
 DataMind's challenge is to carry those ideas across vector retrieval, SQL,
 graph traversal, and memory operations while exposing enough metadata for a
 language model to select an operation.
-
-Table~\ref{tab:positioning} summarizes the qualitative positioning that
-motivates the comparison set. It is a capability matrix, rather than an
-accuracy result. DB-GPT and RAGFlow are therefore retained as external
-baselines only on task subsets that their released systems support; quantitative
-comparisons use the same model, inputs, prompts, and output budget. A partial
-or unsupported capability is not treated as a failed answer on a workload that
-the system was not designed to serve.
-
-\begin{table}[t]
-\centering
-\footnotesize
-\setlength{\tabcolsep}{3.2pt}
-\renewcommand{\arraystretch}{1.12}
-\caption{Qualitative positioning against representative data and agent
-systems. A check mark denotes first-class support, $\sim$ partial or
-product-specific support, and a cross a missing support or a non-goal.}
-\label{tab:positioning}
-\resizebox{\linewidth}{!}{%
-\begin{tabular}{@{}l*{10}{c}@{}}
-\toprule
-\textbf{System} & \textbf{Profile} & \textbf{Docs} & \textbf{SQL}
-& \textbf{Graph} & \textbf{Memory} & \textbf{Wiki} & \textbf{Update}
-& \textbf{Pipeline} & \textbf{IDE} & \textbf{Guards} \\
-\midrule
-DB-GPT~\cite{xue2024dbgpt,dbgpt2026docs} & $\sim$ & \cmark & \cmark & \cmark & $\sim$ & \xmark & $\sim$ & $\sim$ & $\sim$ & $\sim$ \\
-RAGFlow~\cite{ragflow2026} & $\sim$ & \cmark & $\sim$ & \cmark & \cmark & \xmark & \cmark & $\sim$ & $\sim$ & $\sim$ \\
-Dify~\cite{dify2026} & $\sim$ & \cmark & $\sim$ & \xmark & $\sim$ & \xmark & \cmark & $\sim$ & $\sim$ & $\sim$ \\
-AnythingLLM~\cite{anythingllm2026} & $\sim$ & \cmark & \cmark & \xmark & \cmark & \xmark & $\sim$ & $\sim$ & \xmark & \xmark \\
-\addlinespace[1pt]
-LangChain~\cite{langchain2026retrieval} & \xmark & $\sim$ & $\sim$ & $\sim$ & $\sim$ & \xmark & \xmark & \xmark & \xmark & $\sim$ \\
-LangGraph~\cite{langgraph2024} & \xmark & \xmark & \xmark & \xmark & \cmark & \xmark & \xmark & \xmark & \xmark & \cmark \\
-\addlinespace[1pt]
-\rowcolor{green!8}
-\textbf{DataMind} & \cmark & \cmark & \cmark & \cmark & \cmark & \cmark & \cmark & $\sim$ & \cmark & \cmark \\
-\bottomrule
-\end{tabular}}
-\end{table}
 
 \section{Conclusion}
 \label{sec:conclusion}
