@@ -182,22 +182,22 @@ graph unavailable、corrupted artifact、interrupted build、policy violation。
 
 **Baseline：** Retry-only、Fixed-path structured errors、DataMind-full。
 
-**指标：** completion rate、Answer、auditable-answer rate、unsafe answer rate、recovery latency、retry count、rebuilt bytes、rollback success、false fallback rate。
+**指标：** completion rate、Answer、auditable-answer rate、unsafe answer rate、structured-error classification accuracy、parser fallback success、candidate/read-block correctness、recovery latency。
 
 只有“答案正确 + receipt 合法 + revision 正确”才算恢复成功。
 
 **Table RQ4：**
 
-| Fault | System | Completion | Answer | Auditable | Recovery Time | Rebuilt Bytes |
-|---|---|---:|---:|---:|---:|---:|
-| Parser failure | Retry-only |  |  |  |  |  |
-| Parser failure | DataMind-full |  |  |  |  |  |
-| Database/SQL timeout | Retry-only |  |  |  |  |  |
-| Database/SQL timeout | DataMind-full |  |  |  |  |  |
-| Database schema corruption | Retry-only |  |  |  |  |  |
-| Database schema corruption | DataMind-full |  |  |  |  |  |
-| Graph unavailable | Retry-only |  |  |  |  |  |
-| Graph unavailable | DataMind-full |  |  |  |  |  |
+| Fault | System | Completion | Answer | Auditable | Structured Error | Fallback/Block Correct | Recovery Time |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Parser/MinerU failure | Retry-only |  |  |  |  |  |  |
+| Parser/MinerU failure | DataMind-full |  |  |  |  |  |  |
+| Database/SQL timeout | Retry-only |  |  |  |  |  |  |
+| Database/SQL timeout | DataMind-full |  |  |  |  |  |  |
+| Active candidate read | Retry-only |  |  |  |  |  |  |
+| Active candidate read | DataMind-full |  |  |  |  |  |  |
+| Graph unavailable | Retry-only |  |  |  |  |  |  |
+| Graph unavailable | DataMind-full |  |  |  |  |  |  |
 
 **图：** RQ4-Fig-A recovery outcome；RQ4-Fig-B recovery time 和 rebuilt bytes。
 

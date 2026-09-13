@@ -515,8 +515,8 @@ We inject parser failures, MinerU timeouts, embedding-service failures, empty do
 database and SQL failures (timeouts, connection failures, locked or corrupted
 views), graph unavailability, interrupted builds, and corrupted derived
 artifacts. For each fault, we record whether the request completes,
-whether its answer is correct, whether the evidence remains auditable, how
-long recovery takes, and how much data is rebuilt. We compare retry-only,
+whether its answer is correct, whether the evidence remains auditable, and how
+long the structured failure or parser fallback takes. We compare retry-only,
 fixed-path structured errors, and DataMind's structured errors plus the
 MinerU-to-pypdf parser fallback and candidate/read guards. DataMind does not
 automatically substitute one failed surface for another.
