@@ -825,7 +825,7 @@ class IngestService:
         # Incremental writes must leave the same compatibility metadata that
         # a full KB reindex produces; otherwise the next process startup will
         # reject this otherwise valid persisted index.
-        self._kb.record_incremental_ingest()
+        await self._kb.record_incremental_ingest()
 
     # ------------------------------------------------------------- DB
 

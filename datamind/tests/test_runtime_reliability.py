@@ -380,7 +380,8 @@ async def test_failed_staging_reindex_preserves_old_index(tmp_path: Path):
     assert store.rows == {"old": "old corpus"}
 
 
-def test_incremental_ingest_writes_compatibility_manifest(tmp_path: Path):
+@pytest.mark.asyncio
+async def test_incremental_ingest_writes_compatibility_manifest(tmp_path: Path):
     data_dir = tmp_path / "profile"
     data_dir.mkdir()
     (data_dir / "uploads").mkdir()
@@ -396,7 +397,7 @@ def test_incremental_ingest_writes_compatibility_manifest(tmp_path: Path):
             "dimension": 2,
         },
     )
-    first.record_incremental_ingest()
+    await first.record_incremental_ingest()
     assert manifest_path.is_file()
 
     second = KBService(
@@ -410,6 +411,63 @@ def test_incremental_ingest_writes_compatibility_manifest(tmp_path: Path):
         },
     )
     assert second._compatibility_error is None
+
+
+class _HybridLikeRetriever:
+    """Captures lexical rebuilds the way HybridRetriever.rebuild_lexical does."""
+
+    def __init__(self):
+        self.rebuilds = 0
+
+    async def rebuild_lexical(self):
+        self.rebuilds += 1
+
+
+@pytest.mark.asyncio
+async def test_incremental_ingest_refreshes_cached_lexical_index(tmp_path: Path):
+    """Hybrid retrievers cache BM25 lazily; incremental adds must nudge them."""
+    data_dir = tmp_path / "profile"
+    data_dir.mkdir()
+    retriever = _HybridLikeRetriever()
+    service = KBService(
+        embedding=_Embedding(), vector_store=_StagingStore(), retriever=retriever,
+        data_dir=data_dir, retrieval_cfg=RetrievalConfig(),
+        manifest_path=tmp_path / "storage" / "kb_index_manifest.json",
+        manifest_base={"embedding_provider": "test", "embedding_model": "test-model", "dimension": 2},
+    )
+
+    await service.record_incremental_ingest()
+
+    assert retriever.rebuilds == 1
+
+
+@pytest.mark.asyncio
+async def test_incremental_ingest_marks_service_when_manifest_write_fails(
+    tmp_path: Path, monkeypatch,
+):
+    """A failed manifest write must fail fast, not leave disk state ambiguous."""
+    import datamind.capabilities.kb.service as kb_service
+
+    def _explode(path, manifest):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(kb_service, "write_manifest_atomic", _explode)
+    retriever = _HybridLikeRetriever()
+    service = KBService(
+        embedding=_Embedding(), vector_store=_StagingStore(), retriever=retriever,
+        data_dir=tmp_path / "profile", retrieval_cfg=RetrievalConfig(),
+        manifest_path=tmp_path / "storage" / "kb_index_manifest.json",
+        manifest_base={"embedding_provider": "test", "embedding_model": "test-model", "dimension": 2},
+    )
+
+    with pytest.raises(OSError, match="disk full"):
+        await service.record_incremental_ingest()
+
+    assert service._compatibility_error == "KB manifest write failed; run explicit reindex"
+    with pytest.raises(ConfigError, match="KB manifest write failed"):
+        await service.search("anything")
+    # A failed commit must not refresh the (now suspect) retrieval index.
+    assert retriever.rebuilds == 0
 
 
 @pytest.mark.asyncio
