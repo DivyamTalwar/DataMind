@@ -656,9 +656,9 @@ RQ3 measures DataMind's runtime cost on the same built workspace and task set
 used for RQ1. We hold the model, prompt, tool schema, task order, and surface
 contents constant. \emph{DataMind no-hooks} retains the serving path while
 disabling policy and audit hooks; \emph{DataMind full} enables the default
-hooks, evidence bookkeeping, and audit path. DB-GPT and RAGFlow are included
-only on matched database or document subsets with the same model, data,
-questions, and output budget.
+hooks, evidence bookkeeping, and audit path. DB-GPT and RAGFlow are required on their matched database or document
+subsets with the same model, data, questions, and output budget; unsupported
+surface combinations are marked N/A rather than omitted silently.
 
 We run 60 or 200 tasks at concurrency 1, 5, 20, 50, and 100, with at least
 three repetitions per condition. We report errors, p50/p95/p99 end-to-end
@@ -686,7 +686,8 @@ DataMind no-hooks & 20 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 DataMind full & 20 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 DataMind no-hooks & 100 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 DataMind full & 100 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
-DB-GPT (optional) & 1 & 60 & 0 & 7164.1 & 11660.2 & 13839.5 & 0.1297 & 194.0 \\
+DB-GPT (matched Table/SQL) & 1 & 60 & 0 & 7164.1 & 11660.2 & 13839.5 & 0.1297 & 194.0 \\
+RAGFlow (matched RAG) & 1 & 60 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 \bottomrule
 \end{tabular}}
 \end{table*}
@@ -701,8 +702,9 @@ database and SQL timeouts, connection or schema failures, graph unavailability,
 corrupted artifacts, and interrupted builds. Each fault has a predeclared
 expected behavior: parser fallback, retry, structured error, or explicit block.
 
-We compare DataMind with a retry-only/direct baseline and, where the protocol
-can be matched, DB-GPT or RAGFlow. We report completion, correct answer,
+We compare DataMind with a retry-only/direct baseline and with DB-GPT on
+matched database faults and RAGFlow on matched document/parser faults. An
+unsupported fault is marked N/A with its capability limitation stated. We report completion, correct answer,
 valid evidence, structured-error accuracy, fallback/block correctness,
 recovery time, and unsafe answer or execution rate. A recovery is successful
 only when the task requirement and evidence requirement are both met; a lucky
@@ -722,8 +724,10 @@ Event & System & Completion & Answer & Auditable & Structured error & Fallback/b
 \midrule
 Parser/MinerU failure & Direct mutable & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 Parser/MinerU failure & DataMind-full & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+Parser/MinerU failure & RAGFlow (matched RAG) & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 Database/SQL timeout & Direct mutable & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 Database/SQL timeout & DataMind-full & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+Database/SQL timeout & DB-GPT (matched Table/SQL) & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 Graph unavailable & Direct mutable & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 Graph unavailable & DataMind-full & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 \bottomrule
