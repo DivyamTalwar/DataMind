@@ -178,6 +178,12 @@ publication 和请求级 snapshot pinning。由于内置后端暂时没有历史
 读取，RQ3 必须把“候选期间读取阻断”和“过期 snapshot fail-closed”作为正确性
 条件；不能把它们报告成旧版本继续可读。
 
+这四个名称也不是 Git 分支或 DataMind 的内置运行模式：`main` 已有
+`IngestLedger`，但没有 `SnapshotStore`；`research` 才有 candidate/snapshot
+原语。实验 driver 通过开关组合这些已有原语来模拟条件：Mutable pipeline
+绕过 ledger 和 snapshot，Ledger-only 使用 ledger，Snapshot-only 使用
+SnapshotStore 但绕过 ledger，DataMind-full 使用 `research` 的完整路径。
+
 | 版本 | 保留的机制 | 去掉的机制 | 用来回答什么问题 |
 |---|---|---|---|
 | Mutable pipeline | backend 直接读写 | ledger、receipt、snapshot publication | 没有数据面控制时，stale read、重复写和混合 revision 有多严重？ |
