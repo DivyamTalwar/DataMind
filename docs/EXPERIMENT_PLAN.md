@@ -199,7 +199,7 @@ graph unavailable、corrupted artifact、interrupted build、policy violation。
 | Graph unavailable | Retry-only |  |  |  |  |  |  |
 | Graph unavailable | DataMind-full |  |  |  |  |  |  |
 
-**图：** RQ4-Fig-A recovery outcome；RQ4-Fig-B recovery time 和 rebuilt bytes。
+**图：** RQ4-Fig-A structured-error / fallback / block outcome；RQ4-Fig-B recovery latency。
 
 ## 统一日志
 
