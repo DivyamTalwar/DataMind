@@ -21,16 +21,16 @@ Raw workspace ──► RQ2 Build Agent ──► built surfaces
 | RQ3 efficiency | 部分完成 | 并发 sweep、RSS 采集、no-hooks/full 聚合、外部基线匹配 |
 | RQ4 stability | 部分完成 | parser/MinerU、DB、Graph、embedding 故障注入和统一判定器 |
 
-旧 report 的数字只有在 workspace、模型、prompt、DataMind commit、故障注入和成功判定都完全一致时才能直接复用；否则保留为 pilot，并用当前协议重跑。Table 8 目前只有 concurrency=1，Table 10--12 使用旧 fault/policy 判定，因此这些已有数字目前属于 pilot，不是因为表格本身有问题，而是为了避免把不可比的数字放在同一主结果中。
+旧 report 的数字只有在 workspace、模型、prompt、DataMind commit、故障注入和成功判定都完全一致时才能直接复用；否则保留为 pilot，并用当前协议重跑。Table 7 目前只有 concurrency=1，Table 9--11 使用旧 fault/policy 判定，因此这些已有数字目前属于 pilot，不是因为表格本身有问题，而是为了避免把不可比的数字放在同一主结果中。
 
 ## RQ、输入和表格
 
 | RQ | 研究问题 | 输入 | 主要指标 | 论文表格 |
 |---|---|---|---|---|
 | RQ1 | 在相同 built surfaces 上，surface-aware Serving Agent 是否提高质量和工具效率？ | RQ2 的 built workspace + WorkSurface-Bench | Route-F1、Evidence、Answer、Efficiency、tokens、p95 | Table 2--4 |
-| RQ2 | 多种 surface 的构建成本是多少，何时由后续查询摊平？ | raw workspace | build time、storage、coverage、provenance、C(N) | Table 5--7 |
-| RQ3 | DataMind Serving Agent 的延迟、吞吐、内存和管理开销是多少？ | RQ1 的固定 task set、built workspace | p50/p95/p99、QPS、RSS、errors、breakdown | Table 8 |
-| RQ4 | parser、MinerU、embedding、DB、Graph 等组件异常时，系统能否稳定失败或正确回退？ | 相同 built workspace + 故障注入脚本 | completion、correct answer、structured error、fallback/block、recovery time | Table 9--12 |
+| RQ2 | 多种 surface 的构建成本是多少，何时由后续查询摊平？ | raw workspace | build time、storage、coverage、provenance、C(N) | Table 5--6 |
+| RQ3 | DataMind Serving Agent 的延迟、吞吐、内存和管理开销是多少？ | RQ1 的固定 task set、built workspace | p50/p95/p99、QPS、RSS、errors、breakdown | Table 7 |
+| RQ4 | parser、MinerU、embedding、DB、Graph 等组件异常时，系统能否稳定失败或正确回退？ | 相同 built workspace + 故障注入脚本 | completion、correct answer、structured error、fallback/block、recovery time | Table 8--11 |
 
 DB-GPT 和 RAGFlow 必须参加它们能够支持且协议可对齐的子集：DB-GPT 对 Table/SQL，RAGFlow 对 document/RAG。RQ3 必须报告这些 matched-subset efficiency 结果；RQ4 必须在它们能够复现相同故障的子集上报告 stability 结果。只有不支持的 surface/fault 才填 N/A，并在表注中说明原因。
 
@@ -95,9 +95,9 @@ Table 2 是模型 × 条件主结果，Table 3 是任务类型，Table 4 仍使�
 | Heuristic-demand | 按预先固定的文件类型或离线 workload 规则选择 surface |
 | DataMind-build | 使用 DataMind Build Agent 物化 configured surfaces，并记录完整 provenance、validation 和构建结果 |
 
-记录 build time、API/LLM calls、storage、source coverage、provenance completeness、validation failures；让同一个 Worker 在各策略产物上回答固定任务，计算 `C(N)=C_build+N*C_serve`，`N={0,10,50,100,500,1000,5000}`。Table 7 直接报告累计成本和 break-even，作为 RQ2 的主结论。
+记录 build time、API/LLM calls、storage、source coverage、provenance completeness、validation failures；让同一个 Worker 在各策略产物上回答固定任务，计算 `C(N)=C_build+N*C_serve`，`N={0,10,50,100,500,1000,5000}`。Table 5 和 Table 6 共同覆盖构建成本、下游价值和摊平分析。
 
-### Table 5–7：RQ2 build cost
+### Table 5–6：RQ2 build cost
 
 这张表回答 RQ2 的第一部分：构建不同 surface 需要多少时间、调用、存储和验证成本，以及覆盖率和 provenance 是否完整。比较单 surface、Eager-all、Heuristic-demand 与 DataMind-build，用来说明 DataMind 的入库代价及其数据质量。
 
@@ -122,16 +122,6 @@ Table 2 是模型 × 条件主结果，Table 3 是任务类型，Table 4 仍使�
 | Eager-all | 100 | TBD | TBD | TBD | TBD | TBD |
 | DataMind-build | 100 | TBD | TBD | TBD | TBD | TBD |
 
-这张表把 RQ2 的摊平分析变成可直接验收的数字。它比较每种策略的固定构建成本、每次查询成本和累计成本，报告达到预设查询量时哪种策略更划算。
-
-**Table 7 — 累计成本和 break-even**
-
-| Strategy | Build cost | Cost/query | N=100 | N=1,000 | N=5,000 | Break-even N |
-|---|---:|---:|---:|---:|---:|---:|
-| Document-only | TBD | TBD | TBD | TBD | TBD | TBD |
-| Eager-all | TBD | TBD | TBD | TBD | TBD | TBD |
-| DataMind-build | TBD | TBD | TBD | TBD | TBD | TBD |
-
 ## RQ3：Serving efficiency
 
 固定 RQ1 的 task set、模型、prompt、tool schema 和 built workspace，只比较：
@@ -140,13 +130,13 @@ Table 2 是模型 × 条件主结果，Table 3 是任务类型，Table 4 仍使�
 - **DataMind full**：默认配置，启用 hooks、evidence 和审计路径；
 - **DB-GPT/RAGFlow（matched subset，必须）**：DB-GPT 对 Table/SQL，RAGFlow 对 RAG/document；协议不支持的单元格填 N/A。
 
-并发度为 `1,5,20,50,100`，每条件 60 或 200 tasks，至少三次。DataMind、DB-GPT 和 RAGFlow 在各自 matched subset 上使用相同的 concurrency、N、task order、模型 endpoint、timeout、硬件和 warm-up；不能满足这些条件的系统只报告单独 latency，不做直接 QPS 比较。报告 errors、p50/p95/p99、QPS、peak RSS、tool/model/hooks latency breakdown 和 tokens。Table 8 是 runtime 主表；旧单并发数字只作 pilot。
+并发度为 `1,5,20,50,100`，每条件 60 或 200 tasks，至少三次。DataMind、DB-GPT 和 RAGFlow 在各自 matched subset 上使用相同的 concurrency、N、task order、模型 endpoint、timeout、硬件和 warm-up；不能满足这些条件的系统只报告单独 latency，不做直接 QPS 比较。报告 errors、p50/p95/p99、QPS、peak RSS、tool/model/hooks latency breakdown 和 tokens。Table 7 是 runtime 主表；旧单并发数字只作 pilot。
 
-### Table 8：RQ3 serving efficiency
+### Table 7：RQ3 serving efficiency
 
 这张表回答 RQ3：DataMind 的 serving 管理路径带来多少系统开销。比较 no-hooks、full 和匹配的外部系统，在相同任务集上观察并发升高时的延迟、QPS、RSS 和错误率；它不衡量答案质量。
 
-**Table 8 — 并发、延迟、吞吐和内存**
+**Table 7 — 并发、延迟、吞吐和内存**
 
 | System | Concurrency | N | Errors↓ | p50 ms↓ | p95 ms↓ | p99 ms↓ | QPS↑ | Peak RSS MB↓ |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -165,13 +155,13 @@ Table 2 是模型 × 条件主结果，Table 3 是任务类型，Table 4 仍使�
 
 比较 DataMind、retry-only/direct baseline，以及在对应子集上强制加入的 DB-GPT（Table/SQL）和 RAGFlow（document/RAG）。指标为 completion、correct answer、auditable evidence、structured-error accuracy、fallback/block correctness、recovery time、unsafe answer/execution rate。恢复成功必须同时满足任务要求和证据有效；猜对答案不算稳定恢复。
 
-Table 9 是统一 fault matrix；Table 10 是旧 recovery pilot；Table 11 是 profile/memory isolation；Table 12 是 SQL policy safety。四张表共同回答“组件异常时系统是否保持可控行为”，不再拆成多个互不相关的贡献。
+Table 8 是统一 fault matrix；Table 9 是旧 recovery pilot；Table 10 是 profile/memory isolation；Table 11 是 SQL policy safety。四张表共同回答“组件异常时系统是否保持可控行为”，不再拆成多个互不相关的贡献。
 
-### Table 9–12：RQ4 component stability
+### Table 8–11：RQ4 component stability
 
 这张表回答 RQ4 的核心问题：组件挂掉时，系统是否按预期 fallback、retry、structured error 或 block。每种事件比较 Direct mutable、DataMind-full 以及可匹配的 DB-GPT/RAGFlow，结果用于区分“稳定失败”与“返回错误答案”。
 
-**Table 9 — 统一故障矩阵**
+**Table 8 — 统一故障矩阵**
 
 | Event | System | Completion | Answer | Auditable | Structured error | Fallback/block | Recovery ms |
 |---|---|---:|---:|---:|---:|---:|---:|
@@ -186,7 +176,7 @@ Table 9 是统一 fault matrix；Table 10 是旧 recovery pilot；Table 11 是 p
 
 这张表保留旧 report 的总体 recovery 结果，作为 RQ4 的历史 pilot。它比较 Fixed pipeline 与 DataMind live 在 KB、Graph、DB 和 corruption 故障下的恢复率；正式结果必须用当前的 evidence 和正确性判定重跑。
 
-**Table 10 — 旧 report recovery pilot（按新判定重跑）**
+**Table 9 — 旧 report recovery pilot（按新判定重跑）**
 
 | System | KB empty | Graph down | DB timeout | Partial corruption | Overall |
 |---|---:|---:|---:|---:|---:|
@@ -195,7 +185,7 @@ Table 9 是统一 fault matrix；Table 10 是旧 recovery pilot；Table 11 是 p
 
 这张表验证 RQ4 的隔离稳定性。比较 Flat namespace 与 DataMind three-scope 的记忆泄漏、答案泄漏和召回率；理想结果是泄漏为 0、合法记忆召回为 100%。
 
-**Table 11 — profile/memory isolation**
+**Table 10 — profile/memory isolation**
 
 | Setting | Memory leakage↓ | Memory recall↑ | Answer leakage↓ | Answer recall↑ | Mixed answer↓ |
 |---|---:|---:|---:|---:|---:|
@@ -204,7 +194,7 @@ Table 9 是统一 fault matrix；Table 10 是旧 recovery pilot；Table 11 是 p
 
 这张表验证 RQ4 的 SQL 安全边界。比较直接执行、关键词 guard、DB-GPT 和 DataMind hooks 对危险 SQL 的召回与误报，说明系统能否拦住危险操作而不过度阻断安全查询。
 
-**Table 12 — SQL policy safety**
+**Table 11 — SQL policy safety**
 
 | System | Unsafe recall↑ | FP rate↓ | Recall--FP↑ |
 |---|---:|---:|---:|
@@ -220,6 +210,6 @@ Table 9 是统一 fault matrix；Table 10 是旧 recovery pilot；Table 11 是 p
 1. 共同锁定 workspace、模型、prompt、日志 schema 和成功判定，先用 20 tasks 做 smoke。
 2. 同学 B 完成 RQ2 build driver；同学 A 在相同 built workspace 上完成 RQ1 adapter/scorer。
 3. 同学 C 复用 RQ1 task set 完成 RQ3 efficiency；同学 D 在相同 workspace 上完成 RQ4 fault runner。
-4. 统一生成 Table 2--12 和图，检查每个结果都能追溯到 build、task id 和完整 trace。
+4. 统一生成 Table 2--11 和图，检查每个结果都能追溯到 build、task id 和完整 trace。
 
 同学可以分别写 driver 和填表，但不能各自改变数据、模型、prompt 或成功判定；共享 runtime 只做向后兼容的最小修改。
