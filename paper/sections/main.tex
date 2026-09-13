@@ -644,23 +644,21 @@ DataMind-build & 100 & \tbd & \tbd & \tbd & \tbd & \tbd \\
 \end{tabular}}
 \end{table}
 
-This diagnostic table isolates the effect of ingestion components. It compares chunkers and embedders so that retrieval differences are not misattributed to the overall build strategy.
+This table turns the RQ2 amortization analysis into a directly checkable
+result. It reports fixed build cost, marginal serving cost, cumulative cost at
+several query volumes, and the break-even point for each strategy.
 
 \begin{table}[t]
 \centering\footnotesize
-\caption{Pilot ingestion component sensitivity from the earlier report on its
-MS MARCO subset. These values must be rerun before being used as a primary
-WorkSurface-Build result.}
-\label{tab:rq2-ingest}
-\begin{tabular}{@{}lllrrr@{}}
+\caption{RQ2 cumulative cost and break-even after materialization.}
+\label{tab:rq2-break-even}
+\begin{tabular}{@{}lrrrrrr@{}}
 \toprule
-System & Chunker & Embedder & NDCG@10$\uparrow$ & Recall@10$\uparrow$ & MRR$\uparrow$ \\
+Strategy & Build & Cost/query & $N=100$ & $N=1{,}000$ & $N=5{,}000$ & Break-even $N$ \\
 \midrule
-DataMind auto & built-in & Qwen v2 & 0.9625 & 0.9920 & 0.9533 \\
-DataMind BYOP & sentence & Qwen v2 & 0.9641 & 0.9960 & 0.9543 \\
-DataMind BYOP & sentence & Qwen v3 & 0.9859 & 0.9960 & 0.9828 \\
-DataMind BYOP & sentence & Qwen v4 & 0.9861 & 1.0000 & 0.9814 \\
-DB-GPT & built-in & Qwen v4 & 0.9834 & 0.9980 & 0.9785 \\
+Document-only & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+Eager-all & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+DataMind-build & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -672,15 +670,18 @@ RQ3 measures DataMind's runtime cost on the same built workspace and task set
 used for RQ1. We hold the model, prompt, tool schema, task order, and surface
 contents constant. \emph{DataMind no-hooks} retains the serving path while
 disabling policy and audit hooks; \emph{DataMind full} enables the default
-hooks, evidence bookkeeping, and audit path. DB-GPT and RAGFlow are required on their matched database or document
-subsets with the same model, data, questions, and output budget; unsupported
-surface combinations are marked N/A rather than omitted silently.
+hooks, evidence bookkeeping, and audit path. DB-GPT and RAGFlow are required
+on their matched database or document subsets with the same model, data,
+questions, and output budget; unsupported surface combinations are marked N/A
+rather than omitted silently.
 
 We run 60 or 200 tasks at concurrency 1, 5, 20, 50, and 100, with at least
-three repetitions per condition. We report errors, p50/p95/p99 end-to-end
-latency, QPS, peak RSS, tool calls, tokens, and model/tool/hook latency
-breakdowns. This isolates the cost of DataMind's serving and management path
-without confusing it with answer-quality differences.
+three repetitions per condition. Every system uses the same offered
+concurrency, task count, task order, model endpoint, timeout, hardware, and
+warm-up policy within its matched subset. If a system cannot satisfy these
+controls, we report its latency separately and make no direct QPS comparison.
+We report errors, p50/p95/p99 end-to-end latency, QPS, peak RSS, tool calls,
+tokens, and model/tool/hook latency breakdowns.
 
 This table is the RQ3 efficiency result. It compares DataMind no-hooks, DataMind full, and matched external systems as concurrency increases, reporting latency, throughput, memory, and errors.
 

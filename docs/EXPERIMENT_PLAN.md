@@ -21,7 +21,7 @@ Raw workspace ──► RQ2 Build Agent ──► built surfaces
 | RQ3 efficiency | 部分完成 | 并发 sweep、RSS 采集、no-hooks/full 聚合、外部基线匹配 |
 | RQ4 stability | 部分完成 | parser/MinerU、DB、Graph、embedding 故障注入和统一判定器 |
 
-旧 report 的数字只有在 workspace、模型、prompt、DataMind commit、故障注入和成功判定都完全一致时才能直接复用；否则保留为 pilot，并用当前协议重跑。Table 7 使用旧 MS MARCO/旧 ingestion 配置，Table 8 只有 concurrency=1，Table 10--12 使用旧 fault/policy 判定，因此目前都属于 pilot，不是因为表格本身有问题，而是为了避免把不可比的数字放在同一主结果中。
+旧 report 的数字只有在 workspace、模型、prompt、DataMind commit、故障注入和成功判定都完全一致时才能直接复用；否则保留为 pilot，并用当前协议重跑。Table 8 目前只有 concurrency=1，Table 10--12 使用旧 fault/policy 判定，因此这些已有数字目前属于 pilot，不是因为表格本身有问题，而是为了避免把不可比的数字放在同一主结果中。
 
 ## RQ、输入和表格
 
@@ -95,7 +95,7 @@ Table 2 是模型 × 条件主结果，Table 3 是任务类型，Table 4 仍使�
 | Heuristic-demand | 按预先固定的文件类型或离线 workload 规则选择 surface |
 | DataMind-build | 使用 DataMind Build Agent 物化 configured surfaces，并记录完整 provenance、validation 和构建结果 |
 
-记录 build time、API/LLM calls、storage、source coverage、provenance completeness、validation failures；让同一个 Worker 在各策略产物上回答固定任务，计算 `C(N)=C_build+N*C_serve`，`N={0,10,50,100,500,1000,5000}`。Table 7 的旧 MS MARCO chunker/embedder 数字是 build diagnostic，需重跑。
+记录 build time、API/LLM calls、storage、source coverage、provenance completeness、validation failures；让同一个 Worker 在各策略产物上回答固定任务，计算 `C(N)=C_build+N*C_serve`，`N={0,10,50,100,500,1000,5000}`。Table 7 直接报告累计成本和 break-even，作为 RQ2 的主结论。
 
 ### Table 5–7：RQ2 build cost
 
@@ -122,17 +122,15 @@ Table 2 是模型 × 条件主结果，Table 3 是任务类型，Table 4 仍使�
 | Eager-all | 100 | TBD | TBD | TBD | TBD | TBD |
 | DataMind-build | 100 | TBD | TBD | TBD | TBD | TBD |
 
-这张表是构建组件诊断，不是新的主 RQ。它比较 chunker 和 embedder 对检索质量的影响，帮助解释 Table 5/6 的构建质量来源；旧数字只有在配置完全一致时才能复用。
+这张表把 RQ2 的摊平分析变成可直接验收的数字。它比较每种策略的固定构建成本、每次查询成本和累计成本，报告达到预设查询量时哪种策略更划算。
 
-**Table 7 — 旧 report 的 ingestion diagnostic（必须重跑）**
+**Table 7 — 累计成本和 break-even**
 
-| System | Chunker | Embedder | NDCG@10↑ | Recall@10↑ | MRR↑ |
-|---|---|---|---:|---:|---:|
-| DataMind auto | built-in | Qwen v2 | 0.9625 | 0.9920 | 0.9533 |
-| DataMind BYOP | sentence | Qwen v2 | 0.9641 | 0.9960 | 0.9543 |
-| DataMind BYOP | sentence | Qwen v3 | 0.9859 | 0.9960 | 0.9828 |
-| DataMind BYOP | sentence | Qwen v4 | 0.9861 | 1.0000 | 0.9814 |
-| DB-GPT | built-in | Qwen v4 | 0.9834 | 0.9980 | 0.9785 |
+| Strategy | Build cost | Cost/query | N=100 | N=1,000 | N=5,000 | Break-even N |
+|---|---:|---:|---:|---:|---:|---:|
+| Document-only | TBD | TBD | TBD | TBD | TBD | TBD |
+| Eager-all | TBD | TBD | TBD | TBD | TBD | TBD |
+| DataMind-build | TBD | TBD | TBD | TBD | TBD | TBD |
 
 ## RQ3：Serving efficiency
 
@@ -142,7 +140,7 @@ Table 2 是模型 × 条件主结果，Table 3 是任务类型，Table 4 仍使�
 - **DataMind full**：默认配置，启用 hooks、evidence 和审计路径；
 - **DB-GPT/RAGFlow（matched subset，必须）**：DB-GPT 对 Table/SQL，RAGFlow 对 RAG/document；协议不支持的单元格填 N/A。
 
-并发度为 `1,5,20,50,100`，每条件 60 或 200 tasks，至少三次。报告 errors、p50/p95/p99、QPS、peak RSS、tool/model/hooks latency breakdown 和 tokens。Table 8 是 runtime 主表；旧单并发数字只作 pilot。
+并发度为 `1,5,20,50,100`，每条件 60 或 200 tasks，至少三次。DataMind、DB-GPT 和 RAGFlow 在各自 matched subset 上使用相同的 concurrency、N、task order、模型 endpoint、timeout、硬件和 warm-up；不能满足这些条件的系统只报告单独 latency，不做直接 QPS 比较。报告 errors、p50/p95/p99、QPS、peak RSS、tool/model/hooks latency breakdown 和 tokens。Table 8 是 runtime 主表；旧单并发数字只作 pilot。
 
 ### Table 8：RQ3 serving efficiency
 
