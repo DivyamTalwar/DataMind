@@ -46,6 +46,7 @@ from datamind.capabilities.graph.service import GraphService
 from datamind.core.errors import CapabilityError
 from datamind.core.logging import get_logger
 from datamind.core.protocols import GraphTriple, TextModelClient
+from datamind.core.snapshots import SnapshotStore
 
 from .formats import DOCUMENT_EXTS, TABLE_EXTS, extract_document, extract_tabular
 
@@ -123,6 +124,7 @@ class IngestService:
         chunk_size: int,
         chunk_overlap: int,
         allowed_roots: list[Path] | None = None,
+        snapshots: SnapshotStore | None = None,
     ) -> None:
         self._kb = kb
         self._db = db
@@ -132,6 +134,7 @@ class IngestService:
         self._profile_dir = profile_data_dir
         self._chunk_size = chunk_size
         self._chunk_overlap = chunk_overlap
+        self._snapshots = snapshots
         # Default allow-list: this profile's data dir + cwd + cwd parent
         # + system temp + macOS-specific /tmp aliases.
         # The parent-of-cwd entry is what lets users keep demo data in
@@ -499,6 +502,7 @@ class IngestService:
         build_id = f"build-{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}"
         run_dir = self._build_dir(build_id)
         run_dir.mkdir(parents=True, exist_ok=False)
+        candidate = await self._snapshots.begin_candidate() if self._snapshots else None
         state = {
             "build_id": build_id,
             "status": "BUILDING",
@@ -506,11 +510,17 @@ class IngestService:
             "source_inventory": inventory,
             "profile": self._profile_dir.name,
             "created_at": time.time(),
+            "candidate_id": candidate.candidate_id if candidate else None,
         }
         (run_dir / "state.json").write_text(
             json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8"
         )
-        return {"build_id": build_id, "status": "BUILDING", "workspace": str(resolved)}
+        return {
+            "build_id": build_id,
+            "status": "BUILDING",
+            "workspace": str(resolved),
+            "candidate_id": candidate.candidate_id if candidate else None,
+        }
 
     async def build_freeze(self, *, build_id: str) -> dict[str, Any]:
         """Freeze current profile artifacts and record their content hashes."""
@@ -575,6 +585,49 @@ class IngestService:
             "changed": changed,
             "missing": missing,
             "freeze_lock": manifest.get("freeze_lock"),
+        }
+
+    async def build_validate(self, *, build_id: str) -> dict[str, Any]:
+        """Validate the logical candidate associated with a build run."""
+        run_dir = self._build_dir(build_id)
+        state_path = run_dir / "state.json"
+        if not state_path.is_file():
+            raise CapabilityError("ingest", f"unknown build_id '{build_id}'")
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        candidate_id = state.get("candidate_id")
+        if not candidate_id or self._snapshots is None:
+            raise CapabilityError("ingest", "build has no snapshot candidate")
+        try:
+            candidate = await self._snapshots.validate_candidate(candidate_id)
+        except (FileNotFoundError, ValueError) as exc:
+            raise CapabilityError("ingest", str(exc)) from exc
+        state["status"] = "VALIDATED"
+        state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+        return {"build_id": build_id, "candidate_id": candidate.candidate_id, "status": candidate.status}
+
+    async def build_publish(self, *, build_id: str) -> dict[str, Any]:
+        """Publish a validated build candidate as the profile snapshot."""
+        run_dir = self._build_dir(build_id)
+        state_path = run_dir / "state.json"
+        if not state_path.is_file():
+            raise CapabilityError("ingest", f"unknown build_id '{build_id}'")
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        candidate_id = state.get("candidate_id")
+        if not candidate_id or self._snapshots is None:
+            raise CapabilityError("ingest", "build has no snapshot candidate")
+        try:
+            snapshot = await self._snapshots.publish_candidate(candidate_id)
+        except (FileNotFoundError, ValueError) as exc:
+            raise CapabilityError("ingest", str(exc)) from exc
+        state["status"] = "PUBLISHED"
+        state["snapshot_id"] = snapshot.snapshot_id
+        state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+        return {
+            "build_id": build_id,
+            "candidate_id": candidate_id,
+            "snapshot_id": snapshot.snapshot_id,
+            "status": "PUBLISHED",
+            "revisions": snapshot.revisions,
         }
 
     async def build_export(self, *, build_id: str, output_path: str) -> dict[str, Any]:
@@ -1041,6 +1094,7 @@ class IngestService:
         path: str,
         surfaces: list[str] | None = None,
         recursive: bool = True,
+        build_id: str | None = None,
     ) -> dict[str, Any]:
         """Route a workspace into KB, DB, and deterministic Graph surfaces."""
         selected = set(["kb", "db", "graph"] if surfaces is None else surfaces)
@@ -1072,6 +1126,22 @@ class IngestService:
         if "graph" in selected and self._graph is not None:
             results["graph"] = await self.graph_build_lineage(path=path, recursive=recursive)
         results["surfaces"] = sorted(selected)
+        if build_id and self._snapshots is not None:
+            state_path = self._build_dir(build_id) / "state.json"
+            if not state_path.is_file():
+                raise CapabilityError("ingest", f"unknown build_id '{build_id}'")
+            candidate_id = json.loads(state_path.read_text(encoding="utf-8")).get("candidate_id")
+            if not candidate_id:
+                raise CapabilityError("ingest", "build has no snapshot candidate")
+            current = self._snapshots.current()
+            base_revision = current.revisions if current else {}
+            updates = {
+                surface: int(base_revision.get(surface, 0)) + 1
+                for surface in selected
+                if surface not in results.get("disabled_surfaces", [])
+            }
+            await self._snapshots.record_candidate_updates(candidate_id, updates)
+            results["candidate_id"] = candidate_id
         return results
 
     # ------------------------------------------------------------- Graph
@@ -1272,6 +1342,7 @@ def build_ingest_service(
     db: DBService | None,
     graph: GraphService | None,
     llm_client: TextModelClient,
+    snapshots: SnapshotStore | None = None,
 ) -> IngestService:
     return IngestService(
         kb=kb,
@@ -1282,6 +1353,7 @@ def build_ingest_service(
         profile_data_dir=settings.data.data_dir,
         chunk_size=settings.retrieval.chunk_size,
         chunk_overlap=settings.retrieval.chunk_overlap,
+        snapshots=snapshots,
     )
 
 

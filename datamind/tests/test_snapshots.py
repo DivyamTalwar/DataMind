@@ -59,3 +59,19 @@ async def test_store_agent_publishes_receipt_revision(tmp_path: Path):
     result = await agent.store("write")
     assert result["snapshot_id"] == "snapshot-1"
     assert snapshots.current().revisions["kb"] == 4
+
+
+@pytest.mark.asyncio
+async def test_candidate_requires_validation_before_publication(tmp_path: Path):
+    store = SnapshotStore(storage_dir=tmp_path / "storage", profile="demo")
+    await store.ensure_initial({DataSurface.KB: SurfaceManifest(surface=DataSurface.KB)})
+    candidate = await store.begin_candidate()
+    await store.record_candidate_updates(candidate.candidate_id, {"kb": 7, "graph": 2})
+    with pytest.raises(ValueError, match="validated"):
+        await store.publish_candidate(candidate.candidate_id)
+    validated = await store.validate_candidate(candidate.candidate_id)
+    assert validated.status == "validated"
+    published = await store.publish_candidate(candidate.candidate_id)
+    assert published.revisions["kb"] == 7
+    assert published.revisions["graph"] == 2
+    assert store.candidate(candidate.candidate_id).status == "published"

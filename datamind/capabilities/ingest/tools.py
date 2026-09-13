@@ -66,6 +66,12 @@ def build_ingest_tools(svc: IngestService) -> list[ToolSpec]:
     async def _build_verify(build_id: str) -> dict:
         return await svc.build_verify(build_id=build_id)
 
+    async def _build_validate(build_id: str) -> dict:
+        return await svc.build_validate(build_id=build_id)
+
+    async def _build_publish(build_id: str) -> dict:
+        return await svc.build_publish(build_id=build_id)
+
     async def _build_export(build_id: str, output_path: str) -> dict:
         return await svc.build_export(build_id=build_id, output_path=output_path)
 
@@ -108,9 +114,12 @@ def build_ingest_tools(svc: IngestService) -> list[ToolSpec]:
         )
 
     async def _surface_ingest_path(
-        path: str, surfaces: list[str] | None = None, recursive: bool = True
+        path: str, surfaces: list[str] | None = None, recursive: bool = True,
+        build_id: str | None = None,
     ) -> dict:
-        return await svc.surface_ingest_path(path=path, surfaces=surfaces, recursive=recursive)
+        return await svc.surface_ingest_path(
+            path=path, surfaces=surfaces, recursive=recursive, build_id=build_id,
+        )
 
     async def _graph_add_triples_from_text(text: str, max_triples: int = 30) -> dict:
         return await svc.graph_add_triples_from_text(text=text, max_triples=max_triples)
@@ -195,6 +204,20 @@ def build_ingest_tools(svc: IngestService) -> list[ToolSpec]:
             metadata={"group": "workspace", "surface": "workspace", "access": "write"},
         ),
         ToolSpec(
+            name="build_validate",
+            description="Validate the private candidate associated with a workspace build.",
+            input_schema={"type": "object", "properties": {"build_id": {"type": "string"}}, "required": ["build_id"]},
+            handler=_build_validate,
+            metadata={"group": "workspace", "surface": "workspace", "access": "write"},
+        ),
+        ToolSpec(
+            name="build_publish",
+            description="Publish a validated workspace build as the active profile snapshot.",
+            input_schema={"type": "object", "properties": {"build_id": {"type": "string"}}, "required": ["build_id"]},
+            handler=_build_publish,
+            metadata={"group": "workspace", "surface": "workspace", "access": "write"},
+        ),
+        ToolSpec(
             name="surface_ingest_path",
             description=(
                 "Inspect and route a workspace into selected DataMind surfaces: documents to KB, "
@@ -203,7 +226,8 @@ def build_ingest_tools(svc: IngestService) -> list[ToolSpec]:
             input_schema={"type": "object", "properties": {
                 "path": {"type": "string"},
                 "surfaces": {"type": "array", "items": {"type": "string", "enum": ["kb", "db", "graph"]}},
-                "recursive": {"type": "boolean", "default": True}}, "required": ["path"]},
+                "recursive": {"type": "boolean", "default": True},
+                "build_id": {"type": ["string", "null"]}}, "required": ["path"]},
             handler=_surface_ingest_path,
             metadata={"group": "workspace", "surface": "workspace", "access": "write"},
         ),

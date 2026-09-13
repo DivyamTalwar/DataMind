@@ -47,6 +47,17 @@ class ProfileSnapshot(BaseModel):
     created_at: float = Field(default_factory=time.time)
 
 
+class CandidateSnapshot(BaseModel):
+    """Private build candidate waiting for validation and publication."""
+
+    candidate_id: str
+    profile: str
+    base_snapshot_id: str | None = None
+    revisions: dict[str, int] = Field(default_factory=dict)
+    status: str = "building"
+    created_at: float = Field(default_factory=time.time)
+
+
 class SnapshotStore:
     """Atomic JSON-backed snapshot catalog for one profile."""
 
@@ -94,6 +105,116 @@ class SnapshotStore:
     def get(self, snapshot_id: str) -> ProfileSnapshot:
         return self._read_snapshot(snapshot_id)
 
+    def _candidate_path(self, candidate_id: str) -> Path:
+        if not candidate_id.startswith("candidate-"):
+            raise ValueError(f"invalid candidate id: {candidate_id}")
+        return self.root / f"{candidate_id}.json"
+
+    def candidate(self, candidate_id: str) -> CandidateSnapshot:
+        path = self._candidate_path(candidate_id)
+        if not path.is_file():
+            raise FileNotFoundError(f"unknown candidate: {candidate_id}")
+        return CandidateSnapshot.model_validate(json.loads(path.read_text(encoding="utf-8")))
+
+    async def begin_candidate(self) -> CandidateSnapshot:
+        async with self._lock:
+            counter_doc: dict[str, Any] = {}
+            if self._counter_path.is_file():
+                try:
+                    counter_doc = json.loads(self._counter_path.read_text(encoding="utf-8"))
+                except (OSError, TypeError, json.JSONDecodeError):
+                    counter_doc = {}
+            counter = 0
+            try:
+                counter = int(counter_doc.get("next_candidate", 0))
+            except (TypeError, ValueError):
+                counter = 0
+            candidate_id = f"candidate-{counter}"
+            state = CandidateSnapshot(
+                candidate_id=candidate_id,
+                profile=self.profile,
+                base_snapshot_id=self.current_id,
+            )
+            counter_doc["next_candidate"] = counter + 1
+            self._atomic_json(self._counter_path, counter_doc)
+            self._atomic_json(self._candidate_path(candidate_id), state.model_dump(mode="json"))
+            return state
+
+    async def record_candidate_updates(
+        self, candidate_id: str, updates: Mapping[DataSurface | str, int]
+    ) -> CandidateSnapshot:
+        async with self._lock:
+            state = self.candidate(candidate_id)
+            if state.status != "building":
+                raise ValueError(f"candidate is not building: {state.status}")
+            revisions = dict(state.revisions)
+            for raw_surface, revision in updates.items():
+                key = self._key(raw_surface)
+                revisions[key] = int(revision)
+            state = state.model_copy(update={"revisions": revisions})
+            self._atomic_json(self._candidate_path(candidate_id), state.model_dump(mode="json"))
+            return state
+
+    async def validate_candidate(self, candidate_id: str) -> CandidateSnapshot:
+        async with self._lock:
+            state = self.candidate(candidate_id)
+            if state.status != "building":
+                if state.status == "validated":
+                    return state
+                raise ValueError(f"candidate is not building: {state.status}")
+            if any(int(revision) < 0 for revision in state.revisions.values()):
+                raise ValueError("candidate contains an invalid negative revision")
+            if not state.revisions:
+                raise ValueError("candidate has no surface revisions")
+            state = state.model_copy(update={"status": "validated"})
+            self._atomic_json(self._candidate_path(candidate_id), state.model_dump(mode="json"))
+            return state
+
+    async def publish_candidate(self, candidate_id: str) -> ProfileSnapshot:
+        async with self._lock:
+            state = self.candidate(candidate_id)
+            if state.status != "validated":
+                raise ValueError(f"candidate must be validated before publish: {state.status}")
+            current = self.current()
+            manifests: dict[str, SurfaceManifest] = {}
+            if current is not None:
+                manifests.update(current.manifests)
+            for surface, revision in state.revisions.items():
+                previous = manifests.get(surface)
+                if previous is None:
+                    previous = SurfaceManifest(surface=DataSurface(surface))
+                manifests[surface] = previous.model_copy(update={"revision": int(revision)})
+            # Publish inline while holding the same lock to keep candidate
+            # validation and current-pointer advancement atomic.
+            parent = current.snapshot_id if current else state.base_snapshot_id
+            counter = 0
+            if self._counter_path.is_file():
+                try:
+                    counter = int(json.loads(self._counter_path.read_text(encoding="utf-8")).get("next", 0))
+                except (OSError, TypeError, ValueError, json.JSONDecodeError):
+                    counter = 0
+            snapshot_id = f"snapshot-{counter}"
+            counter_doc = {}
+            if self._counter_path.is_file():
+                try:
+                    counter_doc = json.loads(self._counter_path.read_text(encoding="utf-8"))
+                except (OSError, TypeError, json.JSONDecodeError):
+                    counter_doc = {}
+            counter_doc["next"] = counter + 1
+            self._atomic_json(self._counter_path, counter_doc)
+            snapshot = ProfileSnapshot(
+                snapshot_id=snapshot_id,
+                profile=self.profile,
+                parent_id=parent,
+                revisions={key: int(value.revision) for key, value in manifests.items()},
+                manifests=manifests,
+            )
+            self._atomic_json(self.root / f"{snapshot_id}.json", snapshot.model_dump(mode="json", by_alias=True))
+            self._atomic_json(self._current_path, {"snapshot_id": snapshot_id})
+            state = state.model_copy(update={"status": "published"})
+            self._atomic_json(self._candidate_path(candidate_id), state.model_dump(mode="json"))
+            return snapshot
+
     async def ensure_initial(
         self, manifests: Mapping[DataSurface | str, SurfaceManifest]
     ) -> ProfileSnapshot:
@@ -118,7 +239,14 @@ class SnapshotStore:
                 except (OSError, TypeError, ValueError, json.JSONDecodeError):
                     counter = 0
             snapshot_id = f"snapshot-{counter}"
-            self._atomic_json(self._counter_path, {"next": counter + 1})
+            counter_doc: dict[str, Any] = {}
+            if self._counter_path.is_file():
+                try:
+                    counter_doc = json.loads(self._counter_path.read_text(encoding="utf-8"))
+                except (OSError, TypeError, json.JSONDecodeError):
+                    counter_doc = {}
+            counter_doc["next"] = counter + 1
+            self._atomic_json(self._counter_path, counter_doc)
             normalized = {self._key(key): value for key, value in manifests.items()}
             snapshot = ProfileSnapshot(
                 snapshot_id=snapshot_id,
@@ -155,4 +283,4 @@ class SnapshotStore:
         return await self.publish(manifests)
 
 
-__all__ = ["SurfaceManifest", "ProfileSnapshot", "SnapshotStore"]
+__all__ = ["SurfaceManifest", "ProfileSnapshot", "CandidateSnapshot", "SnapshotStore"]

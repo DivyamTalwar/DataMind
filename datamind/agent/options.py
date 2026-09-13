@@ -344,6 +344,10 @@ async def build_datamind(
     if unknown:
         raise ValueError(f"Unknown DataMind surfaces: {sorted(unknown)}")
     settings.ensure_dirs()
+    snapshots = SnapshotStore(
+        storage_dir=settings.data.storage_dir,
+        profile=settings.data.profile,
+    )
 
     client = build_model_client(settings.llm)
     fallback_protocol = settings.llm.fallback_protocol or settings.llm.protocol
@@ -382,6 +386,7 @@ async def build_datamind(
             db=db,
             graph=graph,
             llm_client=fallback_client,
+            snapshots=snapshots,
         )
         if active & {"kb", "db", "graph"} else None
     )
@@ -422,10 +427,6 @@ async def build_datamind(
         assert memory is not None
         catalogue.extend(build_memory_tools(memory))
 
-    snapshots = SnapshotStore(
-        storage_dir=settings.data.storage_dir,
-        profile=settings.data.profile,
-    )
     manifests: dict[str, SurfaceManifest] = {}
     for spec_name in catalogue.names():
         spec = catalogue.get(spec_name)
