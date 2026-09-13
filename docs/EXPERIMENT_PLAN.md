@@ -77,6 +77,125 @@ Table 2 是模型 × 条件主结果，Table 3 是任务类型，Table 4 是 mat
 
 Table 9 是统一 fault matrix；Table 10 是旧 recovery pilot；Table 11 是 profile/memory isolation；Table 12 是 SQL policy safety。四张表共同回答“组件异常时系统是否保持可控行为”，不再拆成多个互不相关的贡献。
 
+## 表格模板（按编号逐项验收）
+
+下面的列名与论文完全一致。空白或 `TBD` 表示尚未完成；带有数值的行来自旧 report，只能作为 pilot，重跑后才能替换。
+
+### RQ1：Serving quality
+
+**Table 2 — 主结果（每个模型至少 ReAct-all/DataMind-full）**
+
+| Model | Condition | Route-F1↑ | Evidence↑ | Answer↑ | Efficiency↑ | Tokens↓ | p95 ms↓ |
+|---|---|---:|---:|---:|---:|---:|---:|
+| GPT-4o-mini | ReAct-all | TBD | TBD | TBD | TBD | TBD | TBD |
+| GPT-4o-mini | DataMind-full | TBD | TBD | TBD | TBD | TBD | TBD |
+| DeepSeek-V4-Pro | ReAct-all | TBD | TBD | TBD | TBD | TBD | TBD |
+| DeepSeek-V4-Pro | DataMind-full | TBD | TBD | TBD | TBD | TBD | TBD |
+| Gemini-3.1-Pro | ReAct-all | TBD | TBD | TBD | TBD | TBD | TBD |
+| Gemini-3.1-Pro | DataMind-full | TBD | TBD | TBD | TBD | TBD | TBD |
+| GPT-5.5 | ReAct-all | TBD | TBD | TBD | TBD | TBD | TBD |
+| GPT-5.5 | DataMind-full | TBD | TBD | TBD | TBD | TBD | TBD |
+
+**Table 3 — 按任务类型**
+
+| Condition | RAG Answer | Table Answer | Graph Answer | Cross Answer | Evidence |
+|---|---:|---:|---:|---:|---:|
+| ReAct-all | TBD | TBD | TBD | TBD | TBD |
+| Naive-router | TBD | TBD | TBD | TBD | TBD |
+| DataMind-full | TBD | TBD | TBD | TBD | TBD |
+| Gold-hint/all | TBD | TBD | TBD | TBD | TBD |
+
+**Table 4 — 外部系统 matched subset**
+
+| System | Subset | Route-F1 | Evidence | Answer | p95 ms | Errors |
+|---|---|---:|---:|---:|---:|---:|
+| DB-GPT | Table/SQL | TBD | TBD | TBD | TBD | TBD |
+| RAGFlow | RAG/document | TBD | TBD | TBD | TBD | TBD |
+| DataMind-full | Same subset | TBD | TBD | TBD | TBD | TBD |
+
+### RQ2：Build Agent cost
+
+**Table 5 — 构建成本和覆盖率**
+
+| Strategy | Time s↓ | API calls↓ | Storage MB↓ | Coverage↑ | Provenance↑ | Validation failures↓ |
+|---|---:|---:|---:|---:|---:|---:|
+| Document-only | TBD | TBD | TBD | TBD | TBD | TBD |
+| Table-only | TBD | TBD | TBD | TBD | TBD | TBD |
+| Graph-only | TBD | TBD | TBD | TBD | TBD | TBD |
+| Eager-all | TBD | TBD | TBD | TBD | TBD | TBD |
+| Heuristic-demand | TBD | TBD | TBD | TBD | TBD | TBD |
+| DataMind-build | TBD | TBD | TBD | TBD | TBD | TBD |
+
+**Table 6 — 构建后的 serving value**
+
+| Strategy | N | Answer | Evidence | Efficiency | p95 ms | Cost/query |
+|---|---:|---:|---:|---:|---:|---:|
+| Document-only | 100 | TBD | TBD | TBD | TBD | TBD |
+| Eager-all | 100 | TBD | TBD | TBD | TBD | TBD |
+| DataMind-build | 100 | TBD | TBD | TBD | TBD | TBD |
+
+**Table 7 — 旧 report 的 ingestion diagnostic（必须重跑）**
+
+| System | Chunker | Embedder | NDCG@10↑ | Recall@10↑ | MRR↑ |
+|---|---|---|---:|---:|---:|
+| DataMind auto | built-in | Qwen v2 | 0.9625 | 0.9920 | 0.9533 |
+| DataMind BYOP | sentence | Qwen v2 | 0.9641 | 0.9960 | 0.9543 |
+| DataMind BYOP | sentence | Qwen v3 | 0.9859 | 0.9960 | 0.9828 |
+| DataMind BYOP | sentence | Qwen v4 | 0.9861 | 1.0000 | 0.9814 |
+| DB-GPT | built-in | Qwen v4 | 0.9834 | 0.9980 | 0.9785 |
+
+### RQ3：Serving efficiency
+
+**Table 8 — 并发、延迟、吞吐和内存**
+
+| System | Concurrency | N | Errors↓ | p50 ms↓ | p95 ms↓ | p99 ms↓ | QPS↑ | Peak RSS MB↓ |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| DataMind no-hooks | 1 | 60 | 2 | 9373.8 | 18329.4 | 24302.7 | 0.0917 | 193.5 |
+| DataMind full | 1 | 60 | 2 | 8458.0 | 15413.4 | 19560.0 | 0.1012 | 188.1 |
+| DataMind no-hooks | 20 | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| DataMind full | 20 | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| DataMind no-hooks | 100 | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| DataMind full | 100 | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| DB-GPT (optional) | 1 | 60 | 0 | 7164.1 | 11660.2 | 13839.5 | 0.1297 | 194.0 |
+
+### RQ4：Component stability
+
+**Table 9 — 统一故障矩阵**
+
+| Event | System | Completion | Answer | Auditable | Structured error | Fallback/block | Recovery ms |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Parser/MinerU failure | Direct mutable | TBD | TBD | TBD | TBD | TBD | TBD |
+| Parser/MinerU failure | DataMind-full | TBD | TBD | TBD | TBD | TBD | TBD |
+| Database/SQL timeout | Direct mutable | TBD | TBD | TBD | TBD | TBD | TBD |
+| Database/SQL timeout | DataMind-full | TBD | TBD | TBD | TBD | TBD | TBD |
+| Graph unavailable | Direct mutable | TBD | TBD | TBD | TBD | TBD | TBD |
+| Graph unavailable | DataMind-full | TBD | TBD | TBD | TBD | TBD | TBD |
+
+**Table 10 — 旧 report recovery pilot（按新判定重跑）**
+
+| System | KB empty | Graph down | DB timeout | Partial corruption | Overall |
+|---|---:|---:|---:|---:|---:|
+| Fixed pipeline | 0.0% (0) | 0.0% (0) | 0.0% (0) | 0.0% (0) | 0.0% (0) |
+| DataMind live | 60.0% (3) | 60.7% (17) | 70.6% (12) | 62.5% (25) | 63.3% (57) |
+
+**Table 11 — profile/memory isolation**
+
+| Setting | Memory leakage↓ | Memory recall↑ | Answer leakage↓ | Answer recall↑ | Mixed answer↓ |
+|---|---:|---:|---:|---:|---:|
+| Flat namespace | 30% | 70% | 68% | 31% | 63% |
+| DataMind three-scope | 0% | 100% | 0% | 100% | 0% |
+
+**Table 12 — SQL policy safety**
+
+| System | Unsafe recall↑ | FP rate↓ | Recall--FP↑ |
+|---|---:|---:|---:|
+| Direct execution | 0% | 0% | 0% |
+| Keyword guard | 8% | 0% | 8% |
+| DB-GPT | 82% | 56% | 26% |
+| DataMind hooks | 100% | 0% | 100% |
+
+验收时先确认每张表的 adapter/driver 能生成一行真实 JSON，再填整表；不要直接手工修改论文中的 `TBD`。
+
 ## 执行顺序和分工
 
 1. 共同锁定 workspace、模型、prompt、日志 schema 和成功判定，先用 20 tasks 做 smoke。
