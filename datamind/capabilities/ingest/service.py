@@ -79,6 +79,14 @@ _LINEAGE_VERSION_MARKER_RE = re.compile(
 )
 
 
+def _infer_table_name(stem: str) -> str:
+    """Turn a filename stem into a deterministic, SQL-safe table name."""
+    name = re.sub(r"[^A-Za-z0-9_]+", "_", stem).strip("_") or "table"
+    if name[0].isdigit():
+        name = f"t_{name}"
+    return name[:64]
+
+
 # ============================================================ path safety
 
 
@@ -814,6 +822,10 @@ class IngestService:
                 for c in chunks
             ],
         )
+        # Incremental writes must leave the same compatibility metadata that
+        # a full KB reindex produces; otherwise the next process startup will
+        # reject this otherwise valid persisted index.
+        self._kb.record_incremental_ingest()
 
     # ------------------------------------------------------------- DB
 
@@ -1010,7 +1022,7 @@ class IngestService:
         if suffix in {".csv", ".tsv"}:
             result = await self.db_import_csv(
                 path=str(resolved),
-                table=table_prefix or resolved.stem,
+                table=table_prefix or _infer_table_name(resolved.stem),
                 if_exists=if_exists,
                 delimiter="\t" if suffix == ".tsv" else delimiter,
             )
@@ -1021,7 +1033,7 @@ class IngestService:
             sheets = extract_tabular(resolved)
         except RuntimeError as exc:
             raise CapabilityError("ingest", str(exc)) from exc
-        prefix = table_prefix or resolved.stem
+        prefix = table_prefix or _infer_table_name(resolved.stem)
         if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,48}", prefix):
             raise CapabilityError("ingest", "table_prefix must contain letters, digits and underscores")
         results: list[dict[str, Any]] = []

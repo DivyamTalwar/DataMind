@@ -380,6 +380,38 @@ async def test_failed_staging_reindex_preserves_old_index(tmp_path: Path):
     assert store.rows == {"old": "old corpus"}
 
 
+def test_incremental_ingest_writes_compatibility_manifest(tmp_path: Path):
+    data_dir = tmp_path / "profile"
+    data_dir.mkdir()
+    (data_dir / "uploads").mkdir()
+    (data_dir / "uploads" / "doc.md").write_text("incremental", encoding="utf-8")
+    manifest_path = tmp_path / "storage" / "kb_index_manifest.json"
+    first = KBService(
+        embedding=_Embedding(), vector_store=_StagingStore(), retriever=object(),
+        data_dir=data_dir, retrieval_cfg=RetrievalConfig(),
+        manifest_path=manifest_path,
+        manifest_base={
+            "embedding_provider": "test",
+            "embedding_model": "test-model",
+            "dimension": 2,
+        },
+    )
+    first.record_incremental_ingest()
+    assert manifest_path.is_file()
+
+    second = KBService(
+        embedding=_Embedding(), vector_store=_StagingStore({"chunk": "text"}), retriever=object(),
+        data_dir=data_dir, retrieval_cfg=RetrievalConfig(),
+        manifest_path=manifest_path,
+        manifest_base={
+            "embedding_provider": "test",
+            "embedding_model": "test-model",
+            "dimension": 2,
+        },
+    )
+    assert second._compatibility_error is None
+
+
 @pytest.mark.asyncio
 async def test_benchmark_checkpoints_and_resumes_without_duplicate_rows(tmp_path: Path):
     class _System:
