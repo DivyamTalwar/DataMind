@@ -125,14 +125,14 @@ the same model, inputs, prompts, and output budget.
 
 \begin{table*}[t]
 \centering
-\footnotesize
-\setlength{\tabcolsep}{6pt}
+\scriptsize
+\setlength{\tabcolsep}{4.5pt}
 \renewcommand{\arraystretch}{1.12}
 \caption{Qualitative positioning against representative data and agent
 systems. A check mark denotes first-class support, $\sim$ partial or
 product-specific support, and a cross a missing support or a non-goal.}
 \label{tab:positioning}
-\resizebox{0.86\textwidth}{!}{%
+\resizebox{0.82\textwidth}{!}{%
 \begin{tabular}{@{}l*{10}{c}@{}}
 \toprule
 \textbf{System} & \textbf{Profile} & \textbf{Docs} & \textbf{SQL}
@@ -277,7 +277,7 @@ corresponding ingestion path is DataMind-Build, shown in
 Figure~\ref{fig:datamind-build}; it is the Build Agent and its publication
 pipeline, not a second product or a different data model.
 
-\begin{figure*}[!b]
+\begin{figure*}[t]
 \centering
 \includegraphics[width=0.94\textwidth]{figures/datamind_overview_v2.pdf}
 \caption{DataMind serving path. The Serving Agent routes a request over
@@ -321,21 +321,6 @@ surfaces so live-only providers cannot leak a partial candidate. The current
 prototype does not claim that every provider stages physical files
 transactionally; it reports an explicit failure when a live-only provider can
 no longer satisfy a pinned record.
-
-\begin{figure*}[!t]
-\centering
-\includegraphics[width=0.94\textwidth]{figures/datamind_build_agent_generated.png}
-\caption{DataMind-Build ingestion path. The Build Agent inventories a profile's
-workspace, plans surface candidates, parses and normalizes sources, projects
-records, validates candidate revisions, and publishes a profile snapshot. The
-candidate descriptor remains unpublished until validation; reads of touched
-surfaces are blocked during candidate assembly, and providers that do not
-support historical artifacts fail closed if a pinned request becomes stale.}
-\label{fig:datamind-build}
-\Description{DataMind-Build pipeline from workspace sources through inspection,
-parsing, surface projection, validation and receipts, to publication of a
-profile snapshot consumed by the Serving Agent.}
-\end{figure*}
 
 \subsection{Surface-to-agent serving}
 \label{sec:serving-agent}
@@ -387,6 +372,20 @@ counted as explicit failures, never as apparently successful mixed views.
 Physical staging and historical reads are provider-level extensions beyond
 the current prototype and are not assumed by the core claim.
 
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.94\textwidth]{figures/datamind_build_agent_generated.png}
+\caption{DataMind-Build ingestion path. The Build Agent inventories a profile's
+workspace, plans surface candidates, parses and normalizes sources, projects
+records, validates candidate revisions, and publishes a profile snapshot. The
+candidate descriptor remains unpublished until validation; reads of touched
+surfaces are blocked during candidate assembly, and providers that do not
+support historical artifacts fail closed if a pinned request becomes stale.}
+\label{fig:datamind-build}
+\Description{DataMind-Build pipeline from workspace sources through inspection,
+parsing, surface projection, validation and receipts, to publication of a
+profile snapshot consumed by the Serving Agent.}
+\end{figure*}
 \subsection{Access control and profile isolation}
 \label{sec:policy}
 
@@ -512,7 +511,9 @@ token measurements make that trade-off explicit.
 \setlength{\tabcolsep}{3.5pt}
 \caption{RQ1 main serving results on WorkSurface-Bench.}
 \label{tab:rq1-main}
-\resizebox{\linewidth}{!}{%
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\resizebox{0.90\textwidth}{!}{%
 \begin{tabular}{@{}llrrrrrr@{}}
 \toprule
 Model & Condition & Route-F1$\uparrow$ & Evidence$\uparrow$ & Answer$\uparrow$ & Efficiency$\uparrow$ & Tokens$\downarrow$ & p95 ms$\downarrow$ \\
@@ -592,7 +593,9 @@ serving value.
 \setlength{\tabcolsep}{3.5pt}
 \caption{RQ2 build cost and materialization coverage.}
 \label{tab:rq2-build}
-\resizebox{\linewidth}{!}{%
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\resizebox{0.90\textwidth}{!}{%
 \begin{tabular}{@{}lrrrrrr@{}}
 \toprule
 Strategy & Time s$\downarrow$ & API calls$\downarrow$ & Storage MB$\downarrow$ & Coverage$\uparrow$ & Provenance$\uparrow$ & Validation failures$\downarrow$ \\
@@ -670,7 +673,9 @@ holding model behavior constant.
 Concurrency-one values are the pilot measurements from the earlier report;
 the remaining rows are reserved for the controlled rerun.}
 \label{tab:rq3-runtime}
-\resizebox{0.94\textwidth}{!}{%
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\resizebox{0.90\textwidth}{!}{%
 \begin{tabular}{@{}llrrrrrrr@{}}
 \toprule
 System & Concurrency & $N$ & Errors$\downarrow$ & p50 ms$\downarrow$ & p95 ms$\downarrow$ & p99 ms$\downarrow$ & QPS$\uparrow$ & Peak RSS MB$\downarrow$ \\
@@ -711,7 +716,9 @@ rewarding a model for guessing after a source outage.
 \setlength{\tabcolsep}{6pt}
 \caption{RQ4 recovery after injected surface and build faults.}
 \label{tab:rq4-faults}
-\resizebox{0.94\textwidth}{!}{%
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\resizebox{0.90\textwidth}{!}{%
 \begin{tabular}{@{}llrrrrrr@{}}
 \toprule
 Fault & System & Completion & Answer & Auditable & Structured error & Fallback/block & Recovery ms \\
@@ -734,7 +741,9 @@ Graph unavailable & DataMind-full & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 \caption{Pilot recovery results from the earlier report. The denominator is
 the affected recoverable slice for each injected fault.}
 \label{tab:rq4-recovery-pilot}
-\resizebox{0.94\textwidth}{!}{%
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\resizebox{0.82\textwidth}{!}{%
 \begin{tabular}{@{}lrrrrr@{}}
 \toprule
 System & KB empty & Graph down & DB timeout & Partial corruption & Overall \\
@@ -754,7 +763,9 @@ than as additional claims about the serving quality benchmark.
 \caption{Pilot profile-scoped memory isolation diagnostic from the earlier
 report.}
 \label{tab:rq4-memory}
-\resizebox{0.94\textwidth}{!}{%
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\resizebox{0.82\textwidth}{!}{%
 \begin{tabular}{@{}lrrrrr@{}}
 \toprule
 Setting & Memory leakage$\downarrow$ & Memory recall$\uparrow$ & Answer leakage$\downarrow$ & Answer recall$\uparrow$ & Mixed answer$\downarrow$ \\
