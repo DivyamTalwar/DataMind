@@ -60,8 +60,9 @@ recovery semantics?
 We present \textbf{DataMind}, a profile-scoped multi-surface data plane for
 tool-using agents. DataMind separates two roles that are often mixed together
 in application code. A \emph{Build Agent} organizes raw workspace artifacts
-into data surfaces: parsed and indexed documents, relational projections,
-dependency graphs, and persistent memory. A \emph{Serving Agent} consumes a
+into data surfaces: parsed and indexed documents, relational projections, and
+dependency graphs. Profile and session memory is populated by the StoreAgent
+through the same surface contracts. A \emph{Serving Agent} consumes a
 published profile view, selects the surfaces and operations relevant to a
 request, and returns values together with evidence receipts. Both roles use the
 same profile, surface contract, revision, provenance, and policy metadata.
@@ -71,10 +72,12 @@ boundary for a user, project, or tenant. Its snapshot names the revisions of
 the surfaces that a request is allowed to observe. A surface manifest describes
 its schema, operations, source set, freshness, evidence type, access policy,
 and estimated cost. Build operations produce source-linked receipts; serving
-operations propagate those receipts into the answer trace. A new build is
-prepared privately and becomes visible only when its surface artifacts pass
-validation and publication. This gives the system an explicit update boundary
-without requiring every physical backend to implement the same storage model.
+operations propagate those receipts into the answer trace. A build records a
+candidate descriptor and advances the logical publication pointer only after
+validation. The prototype blocks reads of surfaces touched by an active
+candidate and fails closed when a live-only provider can no longer satisfy a
+pinned request. This gives the system an explicit update boundary without
+requiring every physical backend to implement the same storage model.
 The design follows the provenance distinction between a result and its
 derivation~\cite{cheney2009provenance,green2007provenance}, but applies it to
 retrieval, SQL, graph traversal, and memory operations in one serving trace.
@@ -104,8 +107,9 @@ This paper makes three contributions:
   multi-surface data-management problem with explicit contracts for surface
   operations, revision visibility, provenance, evidence, and policy.
   \item We design and implement DataMind, a build--serve runtime that
-  materializes, publishes, routes, updates, and recovers document, relational,
-  graph, and memory surfaces for tool-using agents.
+  materializes, publishes, routes, and updates document, relational, graph,
+  and memory surfaces for tool-using agents, with explicit stale-read and
+  candidate-build failure semantics.
   \item We combine an auditable multi-surface serving workload with build,
   update, concurrency, and failure experiments, separating agent quality from
   the data-system costs and correctness properties that support it.
@@ -243,7 +247,7 @@ profile-scoped document, database, graph, memory, and skill surfaces and
 returns an answer with evidence. The profile, policy, revision, and receipt
 interfaces are shared with DataMind-Build.}
 \label{fig:datamind-overview}
-\Description{DataMind architecture showing the Build Agent materializing workspace artifacts into document, database, graph, and memory surfaces, and the Serving Agent routing requests over a published profile snapshot.}
+\Description{DataMind architecture showing DataMind-Build materializing workspace artifacts into document, database, and graph surfaces, while the Serving Agent routes requests over a published profile snapshot that also includes runtime memory.}
 \end{figure*}
 
 \subsection{Workspace-to-surface materialization}
@@ -277,10 +281,12 @@ The next stage projects the extracted blocks into one or more physical
 surfaces. Document blocks are chunked and indexed for hybrid retrieval. Tables
 are written to a relational backend with a schema that can be inspected before
 query execution. Graph records are written with source annotations so a path
-can be traced to the files that induced its edges. Memory records are written
-with an explicit global, profile, or session scope. The Build Agent is allowed
-to produce only the surfaces selected by the profile configuration; it does not
-assume that every workspace needs every representation.
+can be traced to the files that induced its edges. The current build path
+materializes document, database, and graph surfaces; memory and skills remain
+profile-scoped runtime surfaces populated by their own write tools. The Build
+Agent is allowed to produce only the surfaces selected by the profile
+configuration; it does not assume that every workspace needs every
+representation.
 
 Each projection emits a receipt and is validated before publication. Validation
 checks include source coverage, schema shape, duplicate handling, and
@@ -304,20 +310,22 @@ cross-surface request produces a plan that includes the minimum set of
 operations whose evidence types can jointly support the answer.
 
 The planner does not treat all tools as equivalent. It uses operation schemas
-to decide which arguments are legal, source and revision metadata to avoid
-mixing incompatible views, and cost/freshness metadata to rank alternatives.
+to decide which arguments are legal and source and revision metadata to avoid
+mixing incompatible views. Manifests also expose cost and freshness for
+analysis and future planning; the current prototype does not implement a
+cost-based optimizer.
 The model remains responsible for interpreting the request and synthesizing
 natural language, but the data plane controls the values and evidence that can
 enter that synthesis. Intermediate results can be referenced by receipt rather
 than copied verbatim through the model context. This distinction is important
 for tables and graph neighborhoods that are large relative to a prompt.
 
-When a preferred operation fails, the Serving Agent classifies the failure
-before choosing a fallback. An empty retrieval result is evidence that the
-surface returned no matching item; an unavailable graph store is an execution
-failure. A fallback is permitted only when another surface's contract can
-provide the required evidence. The trace records the failed operation, the
-fallback, and the receipts used by the final answer.
+When an operation fails, the Serving Agent preserves the distinction between
+an empty result and an unavailable capability. An empty retrieval result is
+evidence that the surface returned no matching item; an unavailable graph
+store is an execution failure. The model may issue another tool call, but the
+runtime does not claim an automatic cross-surface recovery planner. The trace
+records the failed operation and the receipts used by any final answer.
 
 \subsection{Updates and version visibility}
 \label{sec:updates}
@@ -380,9 +388,9 @@ explicit and gives the evaluation a direct way to compare a mutable pipeline
 with a snapshot-based one.
 
 Document format adapters cover plain text, Markdown, HTML, JSON, XML, source
-code, and PDF. Office documents (DOC/DOCX and PPT/PPTX) can be materialized to
-PDF for a common layout-aware parsing path; tabular files (CSV/TSV and
-XLS/XLSX) are loaded into typed relations. The original file remains the
+code, and PDF. Legacy Office documents (DOC and PPT) are converted to PDF via
+LibreOffice; DOCX and PPTX use native extractors in the current prototype.
+Tabular files (CSV/TSV and XLS/XLSX) are loaded into typed relations. The original file remains the
 lineage source. MinerU is accessed through its hosted API when configured, and
 pypdf provides a local PDF fallback. These choices affect build quality and
 cost, but are not themselves the data-plane contribution.
@@ -445,7 +453,7 @@ prevents a system from appearing efficient merely because it avoids the hard
 cases that require evidence from more than one surface.
 
 The static serving ablation removes surface manifests and evidence receipts one
-at a time. Snapshot publication and bounded fallback are evaluated in the
+at a time. Snapshot publication and parser fallback are evaluated in the
 dynamic update and fault-injection experiments, respectively, because a static
 benchmark with one valid revision and no injected failures cannot identify
 their effects. If the full system improves only answer quality but increases
@@ -461,9 +469,10 @@ WorkSurface-Build begins with raw workspace artifacts and produces the surfaces
 used by a fixed Worker. We compare document-only, database-only, graph-only,
 an unmanaged all-surface build, heuristic demand selection, and DataMind's
 managed build. The unmanaged all-surface condition uses the same configured
-surfaces, parsers, and physical backends as DataMind but omits manifest-driven
-validation, receipts, snapshot publication, and revision management. Build metrics include wall
-clock time, parser and embedding calls, storage, source coverage, provenance
+document, database, and graph surfaces, parsers, and physical backends as
+DataMind but omits manifest-driven validation, receipts, snapshot publication,
+and revision management. Build metrics include wall clock time, parser and
+embedding calls, storage, source coverage, provenance
 completeness, duplicate handling, and failed-stage recovery. After each build,
 the same Worker answers the serving workload so that materialization quality is
 not conflated with Agent behavior.
@@ -487,7 +496,10 @@ dependency edges to a profile. Each update is followed by queries issued before,
 during, and after publication. We measure visibility delay, stale-read rate,
 duplicate-write rate, cross-surface snapshot consistency, and cross-profile
 leakage. The comparison includes a mutable pipeline without a ledger, DataMind
-without snapshot publication, and the complete system.
+without snapshot publication, and the complete system. The ablation harness
+uses the same backend and driver while enabling or bypassing the repository's
+ledger, SnapshotStore publication, and read guard; the full system is the only
+condition that exercises all three together.
 
 Concurrent runs use 1, 5, 20, 50, and 100 sessions. We vary same-profile reads,
 cross-profile reads, concurrent writes, and mixed read/write workloads. The
@@ -499,18 +511,22 @@ improvement.
 \subsection{RQ4: Failure recovery}
 \label{sec:eval-rq4}
 
-We inject parser failures, embedding-service failures, empty document results,
+We inject parser failures, MinerU timeouts, embedding-service failures, empty document results,
 database and SQL failures (timeouts, connection failures, locked or corrupted
 views), graph unavailability, interrupted builds, and corrupted derived
 artifacts. For each fault, we record whether the request completes,
 whether its answer is correct, whether the evidence remains auditable, how
 long recovery takes, and how much data is rebuilt. We compare retry-only,
-fixed-path, DataMind without recovery metadata, and DataMind full.
+fixed-path structured errors, and DataMind's structured errors plus the
+MinerU-to-pypdf parser fallback and candidate/read guards. DataMind does not
+automatically substitute one failed surface for another.
 
-The fault matrix distinguishes unavailable data from empty data. A fallback is
-counted as successful only if it satisfies the task's evidence requirement; a
-plausible answer without a valid receipt is a failure. This prevents the
-recovery experiment from rewarding a model for guessing after a source outage.
+The fault matrix distinguishes unavailable data from empty data. The parser
+fallback is counted as successful only if the resulting evidence satisfies the
+task requirement; a plausible answer without a valid receipt is a failure.
+Surface outages and stale-provider blocks are counted as explicit failures,
+not as successful fallbacks. This prevents the recovery experiment from
+rewarding a model for guessing after a source outage.
 
 \subsection{Ablation and overhead}
 \label{sec:eval-overhead}

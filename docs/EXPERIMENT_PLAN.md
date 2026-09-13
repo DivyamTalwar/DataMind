@@ -4,9 +4,9 @@
 
 ## DataMind 和 DataMind-build
 
-**DataMind** 是面向 tool-using agent 的 workspace data plane。它把同一组原始文件组织成 document、table、graph、memory 等 surface，并在 serving 时通过 manifest、profile、snapshot、receipt 和 revision 管理这些数据。Serving Agent 读取的是一个明确的 profile snapshot，因此可以知道数据来自哪个版本、哪个 source，以及结果是否可审计。
+**DataMind** 是面向 tool-using agent 的 workspace data plane。它把同一组原始文件组织成 document、table、graph、memory 等 surface，并在 serving 时通过 manifest、profile、snapshot、receipt 和 revision 管理这些数据。Serving Agent 读取的是一个明确的 profile snapshot，因此可以知道数据来自哪个版本、哪个 source，以及结果是否可审计；如果内置 live-only provider 已经无法满足这个 snapshot，运行时会 fail-closed，而不是返回混合版本结果。
 
-**DataMind-build** 是 DataMind 的入库方向（Build Agent），不是另一套系统。它从 workspace 开始，检查 source 和 manifest，构建 configured surfaces，把结果写入 candidate revision，完成 validation，生成 receipts，最后发布新的 profile snapshot。RQ2 中它和 `Eager-all / unmanaged-all` 使用相同的 surface、parser 和 backend，区别在于 DataMind-build 管理完整生命周期，而 unmanaged pipeline 直接把结果写入 backend。
+**DataMind-build** 是 DataMind 的入库方向（Build Agent），不是另一套系统。它从 workspace 开始，检查 source 和 manifest，构建 document/database/graph surfaces，把结果记录为 candidate revision，完成 validation，生成 receipts，最后发布新的 profile snapshot。memory 和 skills 是独立的 profile-scoped runtime surfaces。RQ2 中它和 `Eager-all / unmanaged-all` 使用相同的 surface、parser 和 backend，区别在于 DataMind-build 管理完整生命周期，而 unmanaged pipeline 直接把结果写入 backend。
 
 ## 统一设置
 
@@ -34,7 +34,7 @@
 | Always-RAG | 只开放 document surface |
 | Naive-router | 所有 surface 可用，但没有 DataMind snapshot/receipt |
 | ReAct-all | 所有原始工具直接暴露，模型自行探索 |
-| DataMind-full | manifest、snapshot、receipt、fallback 全部开启 |
+| DataMind-full | manifest、receipt、candidate publication、snapshot pinning 和 fail-closed guard 开启；解析器使用 MinerU API，失败时回退 pypdf |
 | Gold-constrained | 只开放 gold 所需 surface，作为 routing upper bound |
 | Gold-hint/all | 所有工具开放，但 prompt 给出 gold surface hint |
 
@@ -79,10 +79,13 @@ RQ1 的静态 benchmark 只能可靠测出 manifest 和 evidence receipt。snaps
   receipt ID。移除后仍可返回值，但没有可审计的来源链。除 benchmark 的
   Evidence 外，必须额外报告 auditable-evidence/receipt completeness，
   否则标准 Evidence 可能无法体现 receipt 的差异。
-- **snapshot**：请求绑定的 profile revision 向量，保证一次读取不混合不同
-  surface revision。只在 RQ3 的 add/modify/delete 和并发实验中比较。
-- **fallback**：surface 或 parser 失败后，根据 contract 选择可证明的替代
-  surface、旧 snapshot 或本地解析器。只在 RQ4 fault injection 中比较。
+- **snapshot**：请求绑定的 profile revision 向量；候选正在更新某个 surface
+  时阻断该 surface 的读取，已发布版本被请求 supersede 后对 live-only
+  provider fail-closed。当前实现不提供旧 artifact 的历史读取。只在 RQ3
+  的 add/modify/delete 和并发实验中比较。
+- **fallback**：当前实现只对 PDF/office 解析提供 MinerU API 到 pypdf 的确定性
+  fallback。surface 故障不会自动切换到另一个 surface；运行时会返回结构化错误，
+  由模型决定是否发起另一工具调用。只在 RQ4 fault injection 中比较。
 
 | Variant | Route-F1 | Evidence | Answer | Invalid Calls | Tokens | Receipt Completeness |
 |---|---:|---:|---:|---:|---:|---:|
@@ -144,17 +147,17 @@ Document-only 不是“只处理 .docx 文件”：CSV、XLSX、PDF 等输入也
 **Baseline（均为实验中实现的对照版本，不是已有产品名称）：**
 
 这里的 baseline 是为了做机制拆分而定义的 feature ablation，不对应四个
-独立产品。当前代码已经有 `IngestLedger`、revision 和 write receipt；
-`snapshot publication` 是论文目标语义，RQ3 正式实验前需要在测试 harness
-中实现 candidate revision、原子发布和按 snapshot 读取。若这部分尚未完成，
-只能先报告 ledger/idempotence 实验，不能声称已经验证 mixed-snapshot 避免。
+独立产品。当前代码已经有 `IngestLedger`、revision、write receipt、candidate
+publication 和请求级 snapshot pinning。由于内置后端暂时没有历史 artifact
+读取，RQ3 必须把“候选期间读取阻断”和“过期 snapshot fail-closed”作为正确性
+条件；不能把它们报告成旧版本继续可读。
 
 | 版本 | 保留的机制 | 去掉的机制 | 用来回答什么问题 |
 |---|---|---|---|
 | Mutable pipeline | backend 直接读写 | ledger、receipt、snapshot publication | 没有数据面控制时，stale read、重复写和混合 revision 有多严重？ |
 | Ledger-only | ingestion ledger、write receipt、source fingerprint | snapshot publication | ledger 是否能解决重复写和写入审计，但仍允许读到不同 surface 的最新状态？ |
 | Snapshot-only | candidate revision、snapshot publication | ledger、idempotent write receipt | snapshot 是否能避免 mixed revision，但无法处理重复 ingestion？ |
-| DataMind-full | ledger + receipt + snapshot + profile policy | 无 | 完整系统 |
+| DataMind-full | ledger + receipt + snapshot + profile policy + candidate/read guards | 无 | 完整系统 |
 
 实现时四个版本必须使用同一批数据、同一并发 driver 和同一 backend。只切换上述机制，不能给某个版本额外的锁或重试策略。这样 Mutable→Ledger-only 主要测 idempotence/audit，Snapshot-only→DataMind-full 主要测 ledger 的增益，Ledger-only→DataMind-full 主要测 snapshot publication 的增益。
 
@@ -177,7 +180,7 @@ Document-only 不是“只处理 .docx 文件”：CSV、XLSX、PDF 等输入也
 database/SQL timeout、database connection failure、schema/view corruption、
 graph unavailable、corrupted artifact、interrupted build、policy violation。
 
-**Baseline：** Retry-only、Fixed-path、DataMind-no-recovery、DataMind-full。
+**Baseline：** Retry-only、Fixed-path structured errors、DataMind-full。
 
 **指标：** completion rate、Answer、auditable-answer rate、unsafe answer rate、recovery latency、retry count、rebuilt bytes、rollback success、false fallback rate。
 
@@ -200,7 +203,7 @@ graph unavailable、corrupted artifact、interrupted build、policy violation。
 
 ## 统一日志
 
-每个 task 保存以下字段：
+每个 task 保存以下字段（内部 surface 名称使用 `kb`、`db`、`graph`、`memory`）：
 
 ~~~json
 {
@@ -210,8 +213,8 @@ graph unavailable、corrupted artifact、interrupted build、policy violation。
   "task_id": "...",
   "profile_id": "...",
   "snapshot_id": "...",
-  "required_surfaces": ["table", "graph"],
-  "accessed_surfaces": ["table", "graph"],
+  "required_surfaces": ["db", "graph"],
+  "accessed_surfaces": ["db", "graph"],
   "route_f1": 1.0,
   "evidence": 1.0,
   "answer": 1.0,

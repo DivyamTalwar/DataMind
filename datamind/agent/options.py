@@ -460,10 +460,12 @@ async def build_datamind(
     hooks = _build_hook_chain(settings)
 
     retrieve_prompt = build_retrieve_system_prompt(
-        [retrieve_tools.get(name) for name in retrieve_tools.names()]
+        [retrieve_tools.get(name) for name in retrieve_tools.names()],
+        manifests.values(),
     )
     store_prompt = build_store_system_prompt(
-        [store_tools.get(name) for name in store_tools.names()]
+        [store_tools.get(name) for name in store_tools.names()],
+        manifests.values(),
     )
     retrieve_loop = _build_loop(
         settings=settings,

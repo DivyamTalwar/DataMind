@@ -5,6 +5,8 @@ import pytest
 from datamind.core.contracts import DataSurface
 from datamind.core.snapshots import SnapshotStore, SurfaceManifest
 from datamind.agent.options import AgentServices, StoreAgent
+from datamind.agent.prompts import build_retrieve_system_prompt
+from datamind.core.tools import ToolSpec
 from datamind.core.errors import CapabilityError
 
 
@@ -37,6 +39,22 @@ def test_surface_manifest_serializes_schema_alias():
     assert manifest.model_dump(mode="json", by_alias=True)["schema"] == {
         "tables": ["orders"]
     }
+
+
+def test_retrieve_prompt_exposes_surface_manifest():
+    spec = ToolSpec(
+        name="db_query_sql",
+        description="query",
+        input_schema={"type": "object"},
+        handler=lambda: None,  # type: ignore[arg-type]
+        metadata={"surface": "db", "access": "read"},
+    )
+    prompt = build_retrieve_system_prompt(
+        [spec],
+        [SurfaceManifest(surface=DataSurface.DB, operations=["db_query_sql"], revision=2)],
+    )
+    assert "db_query_sql" in prompt
+    assert "revision=2" in prompt
 
 
 @pytest.mark.asyncio

@@ -50,7 +50,7 @@ The implementation does **not** need, before the paper submission:
 | RQ1 | Does surface-aware serving improve quality and efficiency? | Existing multi-surface tools, typed manifests, structured evidence | Answer, evidence, route F1, irrelevant/invalid calls, tokens, latency |
 | RQ2 | When does multi-surface materialization amortize its cost? | Existing workspace ingestion plus build-run accounting | Build time, calls, storage, coverage, provenance, quality-cost curve |
 | RQ3 | Do receipts and snapshots preserve update correctness? | Ledger integration, candidate build, snapshot publication, pinned reads | Duplicate writes, stale reads, mixed snapshots, visibility delay, isolation |
-| RQ4 | Can the system avoid untraceable answers under representative faults? | Structured failure outcomes, local parser fallback, old-snapshot fallback where valid | Completion, auditable answer, recovery time, false fallback |
+| RQ4 | Can the system avoid untraceable answers under representative faults? | Structured failure outcomes, MinerU-to-pypdf parser fallback, candidate/read fail-closed guards | Completion, auditable answer, recovery time, unsafe fallback |
 
 RQ4 remains a compact robustness experiment. It is not a promise that DataMind
 automatically repairs every backend failure.

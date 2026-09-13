@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
+from datamind.core.snapshots import SurfaceManifest
 from datamind.core.tools import ToolSpec
 
 
@@ -23,6 +24,9 @@ _RETRIEVE_TEMPLATE = """你是 DataMind 的 RetrieveAgent，负责在推理时�
 # 能力总览
 你拥有以下几类工具:
 {tool_groups}
+
+# 当前 surface manifest
+{surface_manifests}
 
 # 工具使用原则
 1. **最小充分数据面**: 只调用回答问题所必需的数据面。表格问题优先 DB，实体关系优先 Graph，文档原文优先 KB；不要为了交叉验证而默认把所有工具都调用一遍。
@@ -103,12 +107,38 @@ def _tool_group_lines(specs: Iterable[ToolSpec]) -> str:
     return "\n".join(lines) if lines else "(暂无可用工具)"
 
 
-def build_retrieve_system_prompt(specs: Iterable[ToolSpec]) -> str:
-    return _RETRIEVE_TEMPLATE.format(tool_groups=_tool_group_lines(specs))
+def _manifest_lines(manifests: Iterable[SurfaceManifest] | None) -> str:
+    if not manifests:
+        return "(运行时未提供显式 manifest；以工具描述为准)"
+    lines: list[str] = []
+    for manifest in manifests:
+        operations = ", ".join(manifest.operations) or "(none)"
+        lines.append(
+            f"- {manifest.surface.value}: operations=[{operations}], "
+            f"revision={manifest.revision}, evidence={manifest.evidence_type}, "
+            f"freshness={manifest.freshness}"
+        )
+    return "\n".join(lines)
 
 
-def build_store_system_prompt(specs: Iterable[ToolSpec]) -> str:
-    return _STORE_TEMPLATE.format(tool_groups=_tool_group_lines(specs))
+def build_retrieve_system_prompt(
+    specs: Iterable[ToolSpec],
+    manifests: Iterable[SurfaceManifest] | None = None,
+) -> str:
+    return _RETRIEVE_TEMPLATE.format(
+        tool_groups=_tool_group_lines(specs),
+        surface_manifests=_manifest_lines(manifests),
+    )
+
+
+def build_store_system_prompt(
+    specs: Iterable[ToolSpec],
+    manifests: Iterable[SurfaceManifest] | None = None,
+) -> str:
+    return _STORE_TEMPLATE.format(
+        tool_groups=_tool_group_lines(specs),
+        surface_manifests=_manifest_lines(manifests),
+    )
 
 
 def build_system_prompt(specs: Iterable[ToolSpec]) -> str:
