@@ -6,14 +6,39 @@
 
 | 部分 | 当前状态 | 现在能得到什么 |
 |---|---|---|
-| DataMind 代码回归 | 可直接运行 | `pytest -q`：两代理、格式解析、ledger、candidate/snapshot、read guard |
+| DataMind 代码回归 | 已完成（181 passed, 5 skipped） | `pytest -q`：两代理、格式解析、ledger、candidate/snapshot、read guard |
 | 通用 serving smoke test | 可直接运行 | `python -m benchmark.run` 生成 JSONL；需要配置模型 API 和自定义问题集 |
 | RQ1 WorkSurface-Bench 全量 | 还不能直接运行 | 缺 benchmark 数据适配、gold surface 解析、Route/Evidence 评分和多条件 sweep |
 | RQ2 WorkSurface-Build | 还不能直接运行 | 缺 Document/Table/Graph/Eager/Heuristic/DataMind-build 的统一 driver 和成本采集 |
-| RQ3 runtime performance | 可做 serving benchmark | 通用 runner 已有并发和 latency；缺 RSS 采集、no-hooks sweep 和结果聚合脚本 |
-| RQ4 fault injection | 只能测局部路径 | 已有 MinerU→pypdf fallback 和结构化 tool errors；缺统一故障注入、结果归一化和 fault matrix runner |
+| RQ3 runtime performance | 部分完成 | 论文 Table 8 已填入旧 report 的 concurrency=1 pilot；还缺并发 sweep、RSS 采集、no-hooks sweep 和结果聚合脚本 |
+| RQ4 fault injection | 部分完成 | 论文 Table 10--12 已填入旧 report 的 pilot；当前 fault matrix 仍缺统一故障注入、结果归一化和 runner |
 
 因此，在没有补齐实验 harness 前，不应把 smoke test 或单元测试写成论文结果。论文中的 RQ 表格只有在相应 adapter、driver 和 scorer 完成后才填入数字。
+
+## 论文表格与完成状态
+
+下面的编号对应论文当前版本。`已完成`表示已有可追溯结果；`pilot，需重跑`
+表示旧 report 已有数字，可以暂时保留在论文中，但正式投稿前要按当前统一协议
+复现；`待补`表示表格结构已经插入论文，但还没有结果。
+
+| 论文表格 | 实验 | 当前状态 | 还需要做什么 |
+|---|---|---|---|
+| Table 1 | 系统能力定位 | 已完成 | 核对最终发布版本的 capability matrix 和引用 |
+| Table 2 | RQ1 WorkSurface-Bench 主结果 | 待补 | 同学 A 完成 adapter、gold parser、scorer、模型 sweep |
+| Table 3 | RQ1 按任务类型 | 待补 | 同学 A 从同一批 task-level trace 分层聚合 |
+| Table 4 | DB-GPT/RAGFlow matched subset | 待补 | 同学 A 只在可复现、协议一致的子集运行；否则保留定性比较 |
+| Table 5 | RQ2 构建成本 | 待补 | 同学 B 完成六种 build strategy driver 和成本采集 |
+| Table 6 | RQ2 serving value/amortization | 待补 | 同学 B 用同一 Worker 跑 $N$ 查询并生成成本曲线 |
+| Table 7 | chunker/embedder sensitivity | pilot，需重跑 | 旧 MS MARCO 数字已填；同学 B 按当前 parser/build 配置复现 |
+| Table 8 | RQ3 latency/QPS/RSS | 部分完成 | concurrency=1 pilot 已填；同学 C 补 5/20/50/100 并发、三次重复和 RSS |
+| Table 9 | 当前 RQ4 fault matrix | 待补 | 同学 D 完成 parser、DB、Graph、candidate/read fault runner |
+| Table 10 | 旧 report recovery matrix | pilot，需重跑 | 旧数字已填；同学 D 按当前 structured-error/audit 判定复现 |
+| Table 11 | memory isolation | pilot，需重跑 | 旧数字已填；同学 D 用当前 profile/scope API 复现 |
+| Table 12 | SQL policy safety | pilot，需重跑 | 旧数字已填；同学 D 用当前 HookChain 复现 |
+
+旧 report 的 Table 7、10、11、12 和 Table 8 的 concurrency=1 行已经写入论文，
+这些数字不是新的 WorkSurface-Bench 主结果。后续同学只需替换对应单元格，不需要
+重新设计论文表格；如果复现结果不同，以当前统一配置的结果为准。
 
 ## RQ 之间的代码耦合
 
@@ -66,6 +91,10 @@ RQ1--RQ4 不需要做成一套统一的大型实验平台，可以由不同同�
 
 ## RQ1：Surface-aware serving 是否改善质量和效率？
 
+**完成状态：待补。** 论文 Table 2--4 已插入但仍为空；当前代码可以跑通通用
+serving smoke test，尚未完成 WorkSurface-Bench adapter、gold surface 解析、
+Route/Evidence scorer 和全量 sweep。
+
 **运行：** 四个模型运行 ReAct-all、Naive-router、DataMind-full、Gold-constrained、Gold-hint/all；同时复现 No-tool 和 Always-RAG。分别报告 RAG、Table、Graph、Cross-surface。
 
 **外部系统对比：** 保留 DB-GPT 和 RAGFlow，但只在它们真正支持且能使用相同模型、相同数据、相同问题和相同输出预算的任务子集上比较。DB-GPT 主要作为 database/structured subset 的端到端基线；RAGFlow 主要作为 document/RAG subset 的基线。不要把只支持单一 surface 的系统与 DataMind 在 Cross-surface 上的总分直接比较。若部署版本、模型或数据处理链无法对齐，则只保留论文 Table 1 的定性能力矩阵和系统说明，不填入定量主表。
@@ -109,6 +138,9 @@ RQ1--RQ4 不需要做成一套统一的大型实验平台，可以由不同同�
 
 ## RQ2：构建多种 surface 的成本何时摊平？
 
+**完成状态：待补。** 论文 Table 5--6 为空；Table 7 有旧 report 的 MS MARCO
+pilot，需由同学 B 用当前 DataMind-build 配置复现。
+
 **策略：** Document-only、Table-only、Graph-only、Eager-all、Heuristic-demand、DataMind-build。Build Agent 和 serving Worker 均固定 GPT-5.5，使用相同原始文件、checksum 和解析配置。
 
 这里的名称指“如何建库”，不要和 RQ1 的 `ReAct-all`（如何调用工具）混淆：
@@ -151,6 +183,9 @@ Document-only 不是“只处理 .docx 文件”：CSV、XLSX、PDF 等输入也
 
 ## RQ3：DataMind 的运行时开销和并发性能
 
+**完成状态：部分完成。** 论文 Table 8 的 concurrency=1 已有旧 report pilot；
+并发 5/20/50/100、三次重复、峰值 RSS 和 latency breakdown 仍需同学 C 完成。
+
 RQ3 不再比较 Mutable/Ledger-only/Snapshot-only，也不把 snapshot 或 receipt
 作为独立变量。它只测 DataMind 在相同任务和相同模型下的端到端系统代价。
 
@@ -185,6 +220,10 @@ input/output tokens 和 model/tool latency 分解。错误率单独报告，不�
 latency breakdown（model、tool、hooks、serialization）。
 
 ## RQ4：故障时能否恢复且保持可审计？
+
+**完成状态：部分完成。** 论文 Table 10--12 有旧 report pilot；当前 Table 9
+仍为空，数据库失败、Graph unavailable、candidate/read guard 和统一审计判定仍需
+同学 D 补齐。
 
 **故障：** parser failure、MinerU timeout、embedding outage、empty retrieval、
 database/SQL timeout、database connection failure、schema/view corruption、
