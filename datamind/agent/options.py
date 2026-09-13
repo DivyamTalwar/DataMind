@@ -147,7 +147,12 @@ class RetrieveAgent:
     def _pin_context(self) -> None:
         ctx = current_context()
         snapshots = self.services.snapshots
-        if ctx is None or snapshots is None or ctx.snapshot_id is not None:
+        if ctx is None or snapshots is None:
+            return
+        # Keep the store in request-local state so the loop can fail closed if
+        # publication advances while a request is still running.
+        ctx.extra["snapshot_store"] = snapshots
+        if ctx.snapshot_id is not None:
             return
         snapshot = snapshots.current()
         if snapshot is not None:

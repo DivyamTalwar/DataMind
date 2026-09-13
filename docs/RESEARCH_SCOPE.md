@@ -19,11 +19,20 @@ The minimum implementation required to support this claim is:
 |---|---|---|
 | Surface contract | A typed manifest for each enabled surface: operations, schema, sources, revision, and evidence type | Section 3; manifest ablation in RQ1 |
 | Auditable ingestion | Existing ledger extended with source checksum, surface, operation, revision, and receipt metadata | Section 3; replay and provenance in RQ3 |
-| Candidate build | A build run writes derived artifacts to a private candidate area and records validation results | Section 3; build correctness in RQ2/RQ3 |
+| Candidate build | A build run records a private candidate descriptor and validation results; provider staging is optional and exposed in the evaluation | Section 3; build correctness in RQ2/RQ3 |
 | Profile snapshot | A profile snapshot names the visible revision of each enabled surface | Section 3; update consistency in RQ3 |
-| Atomic publication | A validated candidate becomes visible through one publish operation | Section 3; visibility delay and mixed-snapshot rate in RQ3 |
+| Atomic publication | A validated candidate becomes the current logical publication through one pointer update | Section 3; visibility delay and mixed-snapshot rate in RQ3 |
 | Snapshot-pinned reads | Request context carries a snapshot id; evidence reports snapshot and surface revision | Section 3; stale/mixed-read metrics in RQ3 |
 | Failure classification | Empty results, unavailable backends, and failed builds have distinct structured outcomes | Section 3; small fault matrix in RQ4 |
+
+Current status: the branch now has typed manifests, persistent candidate
+records, validation, atomic snapshot-pointer publication, request snapshot
+metadata, receipt integration, and a fail-closed read guard that blocks reads
+for surfaces touched by an active candidate. Physical snapshot
+adapters for each backend and reads that open historical artifacts are still
+future work; until they land, the paper must describe snapshots as logical
+publication records with explicit failure on stale providers, rather than
+claim full backend time travel.
 
 The implementation does **not** need, before the paper submission:
 
@@ -52,8 +61,8 @@ automatically repairs every backend failure.
    `surface_ingest_path` explicit lifecycle metadata so StoreAgent receipt
    wrapping cannot reject them.
 2. Add the manifest, revision, and snapshot contracts in `datamind/core`.
-3. Make the build service create and validate candidate artifacts before
-   publication.
+3. Make the build service create and validate candidate descriptors before
+   publication; document provider-level staging separately.
 4. Add snapshot selection to `RequestContext` and include it in read evidence.
 5. Keep the current product behavior available when snapshot mode is disabled,
    so the branch has a clean baseline for ablation.

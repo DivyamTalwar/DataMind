@@ -5,6 +5,7 @@ import pytest
 from datamind.core.contracts import DataSurface
 from datamind.core.snapshots import SnapshotStore, SurfaceManifest
 from datamind.agent.options import AgentServices, StoreAgent
+from datamind.core.errors import CapabilityError
 
 
 @pytest.mark.asyncio
@@ -75,3 +76,26 @@ async def test_candidate_requires_validation_before_publication(tmp_path: Path):
     assert published.revisions["kb"] == 7
     assert published.revisions["graph"] == 2
     assert store.candidate(candidate.candidate_id).status == "published"
+
+
+@pytest.mark.asyncio
+async def test_stale_snapshot_reads_fail_closed(tmp_path: Path):
+    store = SnapshotStore(storage_dir=tmp_path / "storage", profile="demo")
+    first = await store.ensure_initial({DataSurface.KB: SurfaceManifest(surface=DataSurface.KB)})
+    await store.publish_updates({DataSurface.KB: 1})
+    with pytest.raises(CapabilityError, match="historical reads are unavailable"):
+        store.assert_readable(first.snapshot_id, DataSurface.KB)
+    store.assert_readable(store.current_id, DataSurface.KB)
+
+
+@pytest.mark.asyncio
+async def test_candidate_surface_reads_are_blocked_until_publish(tmp_path: Path):
+    store = SnapshotStore(storage_dir=tmp_path / "storage", profile="demo")
+    await store.ensure_initial({DataSurface.KB: SurfaceManifest(surface=DataSurface.KB)})
+    candidate = await store.begin_candidate()
+    await store.record_candidate_updates(candidate.candidate_id, {DataSurface.KB: 1})
+    with pytest.raises(CapabilityError, match="reads are blocked"):
+        store.assert_readable(store.current_id, DataSurface.KB)
+    await store.validate_candidate(candidate.candidate_id)
+    await store.publish_candidate(candidate.candidate_id)
+    store.assert_readable(store.current_id, DataSurface.KB)

@@ -17,6 +17,7 @@ from typing import Any, Mapping
 from pydantic import BaseModel, ConfigDict, Field
 
 from .contracts import DataSurface
+from .errors import CapabilityError
 
 
 class SurfaceManifest(BaseModel):
@@ -101,6 +102,41 @@ class SnapshotStore:
     def current(self) -> ProfileSnapshot | None:
         snapshot_id = self.current_id
         return self._read_snapshot(snapshot_id) if snapshot_id else None
+
+    def assert_readable(self, snapshot_id: str | None, surface: DataSurface | str) -> None:
+        """Fail closed when a provider cannot open an historical snapshot.
+
+        The built-in providers currently expose one live view.  A request that
+        was pinned before publication must therefore never read that live view
+        accidentally.  Providers with historical adapters can replace this
+        check with a snapshot-specific view in a future implementation.
+        """
+        key = self._key(surface)
+        # A provider may write its live files while a build candidate is being
+        # assembled.  Block reads for touched surfaces until the candidate is
+        # validated and published, preventing pre-publication leakage.
+        for candidate_path in self.root.glob("candidate-*.json"):
+            try:
+                candidate = CandidateSnapshot.model_validate(
+                    json.loads(candidate_path.read_text(encoding="utf-8"))
+                )
+            except (OSError, TypeError, ValueError, json.JSONDecodeError):
+                continue
+            if candidate.status == "building" and key in candidate.revisions:
+                raise CapabilityError(
+                    key,
+                    f"surface is being rebuilt by {candidate.candidate_id}; "
+                    "reads are blocked until publication",
+                )
+        if not snapshot_id:
+            return
+        current_id = self.current_id
+        if current_id and snapshot_id != current_id:
+            raise CapabilityError(
+                key,
+                f"snapshot {snapshot_id!r} is no longer current; historical reads "
+                "are unavailable for this provider",
+            )
 
     def get(self, snapshot_id: str) -> ProfileSnapshot:
         return self._read_snapshot(snapshot_id)

@@ -131,6 +131,18 @@ def _spec_to_sdk_tool(spec: ToolSpec, hooks: HookChain | None = None):
         args = args or {}
         effective_args = dict(args)
 
+        # Keep SDK execution semantically aligned with the native loop.  A
+        # live-only provider must reject a request whose pinned snapshot has
+        # been superseded rather than silently mixing revisions.
+        ctx = current_context()
+        if ctx is not None and spec.access.value == "read" and spec.surface is not None:
+            snapshots = ctx.extra.get("snapshot_store")
+            if snapshots is not None:
+                try:
+                    snapshots.assert_readable(ctx.snapshot_id, spec.surface)
+                except Exception as exc:
+                    return _as_text_result(f"[{type(exc).__name__}] {exc}", is_error=True)
+
         # ---- Pre-hook chain --------------------------------------------
         if hooks:
             decision = await hooks.pre(spec.name, effective_args)

@@ -100,6 +100,19 @@ class NativeAgentLoop:
         except Exception as exc:  # unknown tool
             return None, exc, None
 
+        # Providers currently expose a live view.  If publication advances
+        # after this request was pinned, fail closed instead of returning a
+        # mixed-snapshot result.  Historical adapters can satisfy this check
+        # by selecting the requested snapshot in the future.
+        ctx = current_context()
+        if ctx is not None and spec.access == ToolAccess.READ and spec.surface is not None:
+            snapshots = ctx.extra.get("snapshot_store")
+            if snapshots is not None:
+                try:
+                    snapshots.assert_readable(ctx.snapshot_id, spec.surface)
+                except Exception as exc:  # preserve normal tool-error semantics
+                    return None, exc, None
+
         effective_args = dict(tool_input)
         hook_outcome: dict[str, Any] | None = None
 
