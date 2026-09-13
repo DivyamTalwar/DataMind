@@ -486,25 +486,22 @@ aggregate score. This is the experiment that connects WorkSurface-Build to the
 DataMind claim: materialization is useful only when its cost produces durable
 serving value.
 
-\subsection{RQ3: Updates, snapshots, and concurrency}
+\subsection{RQ3: Updates and concurrency}
 \label{sec:eval-rq3}
 
 We apply additions, modifications, deletions, repeated ingestion, and changed
 dependency edges to a profile. Each update is followed by queries issued before,
-during, and after publication. We measure visibility delay, stale-read rate,
-duplicate-write rate, cross-surface snapshot consistency, and cross-profile
-leakage. The comparison includes a mutable pipeline without a ledger, DataMind
-without snapshot publication, and the complete system. The ablation harness
-uses the same backend and driver while enabling or bypassing the repository's
-ledger, SnapshotStore publication, and read guard; the full system is the only
-condition that exercises all three together.
+during, and after publication. We evaluate the current DataMind path as a
+black-box system: reads of surfaces touched by an active candidate must be
+blocked, publication must make the new logical revision visible, repeated writes
+must be idempotent, and profiles must remain isolated. Snapshot identifiers and
+receipts are retained in traces for diagnosis, but are not treated as separate
+quality conditions.
 
 Concurrent runs use 1, 5, 20, 50, and 100 sessions. We vary same-profile reads,
-cross-profile reads, concurrent writes, and mixed read/write workloads. The
-system metrics are throughput, p50/p95/p99 latency, conflicts, failed calls,
-peak memory, and storage growth. Correctness metrics are reported separately;
-a higher throughput with stale or cross-profile results is not counted as an
-improvement.
+cross-profile reads, concurrent writes, and mixed read/write workloads. We report
+blocked-read correctness, stale and mixed-snapshot outcomes, duplicate writes,
+lost updates, cross-profile leakage, throughput, and p50/p95/p99 latency.
 
 \subsection{RQ4: Failure recovery}
 \label{sec:eval-rq4}

@@ -143,39 +143,24 @@ Document-only 不是“只处理 .docx 文件”：CSV、XLSX、PDF 等输入也
 
 **运行：** 更新类型为 add、modify、delete、replay、concurrent update、partial failure；并发客户端为 1、5、20、50、100；工作负载包括 same-profile read、cross-profile read、concurrent write、80/20 read-write、50/50 read-write。
 
-**Baseline（均为实验中实现的对照版本，不是已有产品名称）：**
+RQ3 不再做 Mutable/Ledger-only/Snapshot-only 的机制 ablation。只运行当前
+DataMind 路径，验证更新和并发场景下的黑盒行为：候选更新期间相关 surface
+是否被阻断，发布后新版本是否可见，重复写是否幂等，以及不同 profile 是否
+相互隔离。Snapshot 和 receipt 只作为实现内部的版本与审计字段，不单独比较。
 
-这里的 baseline 是为了做机制拆分而定义的 feature ablation，不对应四个
-独立产品。当前代码已经有 `IngestLedger`、revision、write receipt、candidate
-publication 和请求级 snapshot pinning。由于内置后端暂时没有历史 artifact
-读取，RQ3 必须把“候选期间读取阻断”和“过期 snapshot fail-closed”作为正确性
-条件；不能把它们报告成旧版本继续可读。
-
-这四个名称也不是 Git 分支或 DataMind 的内置运行模式：`main` 已有
-`IngestLedger`，但没有 `SnapshotStore`；`research` 才有 candidate/snapshot
-原语。实验 driver 通过开关组合这些已有原语来模拟条件：Mutable pipeline
-绕过 ledger 和 snapshot，Ledger-only 使用 ledger，Snapshot-only 使用
-SnapshotStore 但绕过 ledger，DataMind-full 使用 `research` 的完整路径。
-
-| 版本 | 保留的机制 | 去掉的机制 | 用来回答什么问题 |
-|---|---|---|---|
-| Mutable pipeline | backend 直接读写 | ledger、receipt、snapshot publication | 没有数据面控制时，stale read、重复写和混合 revision 有多严重？ |
-| Ledger-only | ingestion ledger、write receipt、source fingerprint | snapshot publication | ledger 是否能解决重复写和写入审计，但仍允许读到不同 surface 的最新状态？ |
-| Snapshot-only | candidate revision、snapshot publication | ledger、idempotent write receipt | snapshot 是否能避免 mixed revision，但无法处理重复 ingestion？ |
-| DataMind-full | ledger + receipt + snapshot + profile policy + candidate/read guards | 无 | 完整系统 |
-
-实现时四个版本必须使用同一批数据、同一并发 driver 和同一 backend。只切换上述机制，不能给某个版本额外的锁或重试策略。这样 Mutable→Ledger-only 主要测 idempotence/audit，Snapshot-only→DataMind-full 主要测 ledger 的增益，Ledger-only→DataMind-full 主要测 snapshot publication 的增益。
-
-**指标：** visibility delay、stale-read、mixed-snapshot、duplicate-write、lost-update、cross-profile leakage、throughput、p50/p95/p99 latency。
+**指标：** visibility delay、blocked-read correctness、stale-read、mixed-snapshot、
+duplicate-write、lost-update、cross-profile leakage、throughput、p50/p95/p99
+latency。
 
 **Table RQ3：**
 
-| System | Visibility Delay | Stale Reads | Mixed Snapshot | Duplicate Writes | Leakage | Throughput | p95 |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| Mutable pipeline |  |  |  |  |  |  |  |
-| Ledger-only |  |  |  |  |  |  |  |
-| Snapshot-only |  |  |  |  |  |  |  |
-| DataMind-full |  |  |  |  |  |  |  |
+| Scenario | Expected behavior | Correctness | Visibility Delay | Duplicate Writes | Leakage | Throughput | p95 |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Add/modify/delete |  |  |  |  |  |  |  |
+| Replay same write |  |  |  |  |  |  |  |
+| Active candidate read |  |  |  |  |  |  |  |
+| Concurrent read/write |  |  |  |  |  |  |  |
+| Cross-profile read |  |  |  |  |  |  |  |
 
 **图：** RQ3-Fig-A publication timeline；RQ3-Fig-B throughput–latency curve；RQ3-Fig-C profile isolation heatmap。
 
