@@ -283,6 +283,11 @@ class NativeAgentLoop:
             "result_size_chars": len(self._safe_json(result)),
             "duplicate": duplicate,
         }
+        ctx = current_context()
+        if ctx is not None:
+            trace["snapshot_id"] = ctx.snapshot_id
+            if surface is not None:
+                trace["surface_revision"] = ctx.snapshot_revisions.get(str(surface))
         if error is not None:
             trace.update({
                 "error_type": type(error).__name__,
@@ -382,6 +387,11 @@ class NativeAgentLoop:
                 "content": result,
                 "score": None,
             })
+        if ctx is not None:
+            for item in evidence:
+                item["snapshot_id"] = ctx.snapshot_id
+                if surface is not None:
+                    item["surface_revision"] = ctx.snapshot_revisions.get(str(surface))
         return trace, evidence
 
     @staticmethod

@@ -17,13 +17,15 @@ from pydantic import BaseModel, Field
 
 
 class DataSurface(str, Enum):
-    """The five user-visible knowledge surfaces."""
+    """User-visible knowledge surfaces plus the workspace control plane."""
 
     KB = "kb"
     DB = "db"
     GRAPH = "graph"
     SKILLS = "skills"
     MEMORY = "memory"
+    # Lifecycle operations are receipts too, but are not a knowledge surface.
+    WORKSPACE = "workspace"
 
 
 class ToolAccess(str, Enum):

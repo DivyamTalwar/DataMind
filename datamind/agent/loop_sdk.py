@@ -37,7 +37,7 @@ from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 
 from datamind.core.hooks import AskUser, Allow, Deny, HookChain, Rewrite
-from datamind.core.logging import get_logger
+from datamind.core.logging import current_context, get_logger
 from datamind.core.tools import ToolRegistry, ToolSpec
 
 from .base import AgentEvent, AgentLoopConfig, OnToolEnd, OnToolStart
@@ -316,6 +316,56 @@ class SdkAgentLoop:
             for item in results
         )
 
+    @classmethod
+    def _evidence_from_result(
+        cls, name: str, surface: str | None, tool_input: dict[str, Any], raw: Any
+    ) -> list[dict[str, Any]]:
+        """Normalize SDK tool results to the same evidence shape as native."""
+        if not surface:
+            return []
+        try:
+            result = json.loads(cls._tool_result_text(raw))
+        except (TypeError, ValueError):
+            return []
+        if not isinstance(result, dict):
+            return []
+        ctx = current_context()
+        meta = {
+            "snapshot_id": ctx.snapshot_id if ctx else None,
+            "surface_revision": (
+                ctx.snapshot_revisions.get(surface) if ctx else None
+            ),
+        }
+        if surface == "kb":
+            return [
+                {"surface": surface, "source_id": item.get("source"),
+                 "locator": {"source": item.get("source"), "chunk_id": item.get("id")},
+                 "content": item.get("text"), "score": item.get("score"), **meta}
+                for item in result.get("results", []) if isinstance(item, dict)
+            ]
+        if surface == "memory":
+            return [
+                {"surface": surface, "source_id": item.get("id"),
+                 "locator": {"scope": item.get("scope"), "profile": item.get("profile"),
+                              "session_id": item.get("session_id")},
+                 "content": item.get("content"), "score": item.get("score"), **meta}
+                for item in result.get("results", []) if isinstance(item, dict)
+            ]
+        if surface == "db" and name != "db_list_tables":
+            return [{"surface": surface, "source_id": None,
+                     "locator": {"tables": tool_input.get("tables", []),
+                                  "sql": result.get("sql") or tool_input.get("sql"),
+                                  "columns": result.get("columns")},
+                     "content": {"columns": result.get("columns"),
+                                  "rows": result.get("rows", [])}, "score": None, **meta}]
+        if surface == "graph" and (name != "graph_search_entities" or result.get("entities")):
+            return [{"surface": surface, "source_id": result.get("start") or result.get("entity"),
+                     "locator": {"start": result.get("start") or result.get("entity"),
+                                  "paths": result.get("paths"), "edges": result.get("edges")},
+                     "content": None, "score": None, **meta}]
+        return [{"surface": surface, "source_id": result.get("source") or result.get("path"),
+                 "locator": dict(tool_input), "content": result, "score": None, **meta}]
+
     # ---------------------------------------------------------------- API
 
     async def run_turn(
@@ -340,6 +390,7 @@ class SdkAgentLoop:
         tool_trace: list[dict[str, Any]] = []
         pending_trace: dict[str, dict[str, Any]] = {}
         receipts: list[dict[str, Any]] = []
+        evidence: list[dict[str, Any]] = []
         surfaces_used: list[str] = []
         result_info: dict[str, Any] = {}
 
@@ -394,6 +445,13 @@ class SdkAgentLoop:
                         )
                     if receipt is not None:
                         receipts.append(receipt)
+                    if trace is not None and not getattr(block, "is_error", False):
+                        evidence.extend(
+                            self._evidence_from_result(
+                                trace["name"], trace.get("surface"),
+                                trace.get("input") or {}, block.content,
+                            )
+                        )
             elif isinstance(msg, ResultMessage):
                 result_info = {
                     "subtype": msg.subtype,
@@ -422,7 +480,7 @@ class SdkAgentLoop:
             },
             "tool_trace": tool_trace,
             "surfaces_used": surfaces_used,
-            "evidence": [],
+            "evidence": evidence,
             "receipts": receipts,
         }
 
@@ -456,6 +514,7 @@ class SdkAgentLoop:
         pending_trace: dict[str, dict[str, Any]] = {}
         tool_trace: list[dict[str, Any]] = []
         receipts: list[dict[str, Any]] = []
+        evidence: list[dict[str, Any]] = []
         surfaces_used: list[str] = []
 
         iterations = 0
@@ -511,6 +570,13 @@ class SdkAgentLoop:
                             trace["is_error"] = is_error
                         if receipt is not None:
                             receipts.append(receipt)
+                        if trace is not None and not is_error:
+                            evidence.extend(
+                                self._evidence_from_result(
+                                    trace["name"], trace.get("surface"),
+                                    trace.get("input") or {}, raw,
+                                )
+                            )
                         yield AgentEvent(
                             type="tool_result",
                             data={
@@ -531,7 +597,7 @@ class SdkAgentLoop:
                         },
                         "tool_trace": tool_trace,
                         "surfaces_used": surfaces_used,
-                        "evidence": [],
+                        "evidence": evidence,
                         "receipts": receipts,
                     },
                 )

@@ -41,6 +41,7 @@ from datamind.core.context import RequestContext
 from datamind.core.model_clients import build_model_client
 from datamind.core.protocols import EmbeddingProvider, TextModelClient, ToolCallingModelClient
 from datamind.core.tools import ToolRegistry
+from datamind.core.snapshots import SnapshotStore, SurfaceManifest
 
 from .base import AgentLoopConfig, AgentLoopProtocol
 from .loop_native import NativeAgentLoop
@@ -63,6 +64,7 @@ class AgentServices:
     skills: SkillsService | None = None
     memory: MemoryService | None = None
     ingest: IngestService | None = None
+    snapshots: SnapshotStore | None = None
 
 
 @dataclass
@@ -125,6 +127,7 @@ class RetrieveAgent:
         )
         info["kb_chunks"] = await self.services.kb.count() if self.services.kb else 0
         info["revision"] = self.revision
+        info["snapshot_id"] = self.services.snapshots.current_id if self.services.snapshots else None
         info["hooks"] = self.hooks.names() if self.hooks else []
         _log.info("retrieve_agent_warmup", extra=info)
         return info
@@ -136,9 +139,20 @@ class RetrieveAgent:
         history: list[dict] | None = None,
         final_contract: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        self._pin_context()
         return await self.loop.run_turn(
             user_message=message, history=history, final_contract=final_contract,
         )
+
+    def _pin_context(self) -> None:
+        ctx = current_context()
+        snapshots = self.services.snapshots
+        if ctx is None or snapshots is None or ctx.snapshot_id is not None:
+            return
+        snapshot = snapshots.current()
+        if snapshot is not None:
+            ctx.snapshot_id = snapshot.snapshot_id
+            ctx.snapshot_revisions = dict(snapshot.revisions)
 
 
 @dataclass
@@ -165,7 +179,18 @@ class StoreAgent:
         *,
         history: list[dict] | None = None,
     ) -> dict[str, Any]:
-        return await self.loop.run_turn(user_message=message, history=history)
+        result = await self.loop.run_turn(user_message=message, history=history)
+        snapshots = self.services.snapshots
+        if snapshots is not None:
+            updates: dict[str, int] = {}
+            for receipt in result.get("receipts", []):
+                for item in receipt.get("results", []) if isinstance(receipt, dict) else []:
+                    if item.get("status") == "stored" and item.get("surface"):
+                        updates[str(item["surface"])] = int(receipt.get("revision", 0))
+            if updates:
+                published = await snapshots.publish_updates(updates)
+                result["snapshot_id"] = published.snapshot_id
+        return result
 
 
 @dataclass
@@ -177,6 +202,10 @@ class DataMind:
     services: AgentServices
     profile: str = "default"
     _closed: bool = False
+
+    @property
+    def snapshots(self) -> SnapshotStore | None:
+        return self.services.snapshots
 
     @property
     def store(self) -> StoreAgent:
@@ -214,10 +243,12 @@ class DataMind:
         final_contract: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         if current_context() is not None:
+            self.retrieve_agent._pin_context()
             return await self.retrieve_agent.query(
                 message, history=history, final_contract=final_contract,
             )
         with bind_context(RequestContext.new(profile=self.profile)):
+            self.retrieve_agent._pin_context()
             return await self.retrieve_agent.query(
                 message, history=history, final_contract=final_contract,
             )
@@ -368,7 +399,9 @@ async def build_datamind(
 
     catalogue = ToolRegistry()
     ingest_tools = build_ingest_tools(ingest) if ingest is not None else []
-    catalogue.extend([t for t in ingest_tools if t.surface is None])
+    catalogue.extend(
+        [t for t in ingest_tools if t.surface is None or t.surface.value == "workspace"]
+    )
     if "kb" in active:
         assert kb is not None
         catalogue.extend(build_kb_tools(kb))
@@ -388,6 +421,28 @@ async def build_datamind(
     if "memory" in active:
         assert memory is not None
         catalogue.extend(build_memory_tools(memory))
+
+    snapshots = SnapshotStore(
+        storage_dir=settings.data.storage_dir,
+        profile=settings.data.profile,
+    )
+    manifests: dict[str, SurfaceManifest] = {}
+    for spec_name in catalogue.names():
+        spec = catalogue.get(spec_name)
+        if spec.surface is None:
+            continue
+        key = spec.surface.value
+        manifest = manifests.get(key)
+        if manifest is None:
+            manifest = SurfaceManifest(
+                surface=spec.surface,
+                evidence_type="source-linked" if spec.access == ToolAccess.READ else "write-receipt",
+                freshness="request-time" if spec.access == ToolAccess.READ else "build-time",
+            )
+            manifests[key] = manifest
+        manifest.operations.append(spec.name)
+    await snapshots.ensure_initial(manifests)
+    services.snapshots = snapshots
 
     retrieve_tools = catalogue.select(access={ToolAccess.READ, ToolAccess.UTILITY})
     raw_store_tools = catalogue.select(access={ToolAccess.WRITE})

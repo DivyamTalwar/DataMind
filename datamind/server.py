@@ -119,6 +119,18 @@ def _session_id(x_session_id: str | None = Header(default=None)) -> str:
     return x_session_id or "default"
 
 
+def _request_context(st: AppState, session: str) -> RequestContext:
+    """Pin each HTTP turn to the profile snapshot visible at its start."""
+    snapshots = getattr(st.system, "snapshots", None)
+    snapshot = snapshots.current() if snapshots is not None else None
+    return RequestContext(
+        session_id=session,
+        profile=st.settings.data.profile,
+        snapshot_id=snapshot.snapshot_id if snapshot else None,
+        snapshot_revisions=dict(snapshot.revisions) if snapshot else {},
+    )
+
+
 # --------------------------------------------------------------- models
 
 
@@ -153,6 +165,7 @@ async def health(st: AppState = Depends(_state)) -> dict:
         "retrieve_tools": len(st.system.retrieve.tools),
         "store_tools": len(st.system.store.tools),
         "revision": st.system.store.revision,
+        "snapshot_id": st.system.snapshots.current_id if getattr(st.system, "snapshots", None) else None,
     }
 
 
@@ -183,7 +196,7 @@ async def ask(
     st: AppState = Depends(_state),
     session: str = Depends(_session_id),
 ) -> AskResponse:
-    context = RequestContext(session_id=session, profile=st.settings.data.profile)
+    context = _request_context(st, session)
     with bind_context(context):
         result = await st.system.retrieve.loop.run_turn(
             user_message=req.message,
@@ -208,12 +221,16 @@ async def store(
     session: str = Depends(_session_id),
 ) -> AskResponse:
     """Ask StoreAgent to route and persist data across the five surfaces."""
-    context = RequestContext(session_id=session, profile=st.settings.data.profile)
+    context = _request_context(st, session)
     with bind_context(context):
-        result = await st.system.store.loop.run_turn(
-            user_message=req.message,
-            history=req.history or [],
-        )
+        store_method = getattr(st.system.store, "store", None)
+        if callable(store_method):
+            result = await store_method(req.message, history=req.history or [])
+        else:  # backwards-compatible test/dummy agents
+            result = await st.system.store.loop.run_turn(
+                user_message=req.message,
+                history=req.history or [],
+            )
     return AskResponse(
         answer=result["answer"],
         iterations=result["iterations"],
@@ -233,7 +250,7 @@ async def chat(
     session: str = Depends(_session_id),
 ):
     async def stream() -> AsyncIterator[bytes]:
-        context = RequestContext(session_id=session, profile=st.settings.data.profile)
+        context = _request_context(st, session)
         with bind_context(context):
             async for event in st.system.retrieve.loop.stream_turn(
                 user_message=req.message,
