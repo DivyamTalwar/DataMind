@@ -2,6 +2,19 @@
 
 这份文档用于分工和填结果。每个 RQ 只保留实验条件、指标和结果模板；正式结果必须保存 task-level trace。
 
+## 当前可执行性
+
+| 部分 | 当前状态 | 现在能得到什么 |
+|---|---|---|
+| DataMind 代码回归 | 可直接运行 | `pytest -q`：两代理、格式解析、ledger、candidate/snapshot、read guard |
+| 通用 serving smoke test | 可直接运行 | `python -m benchmark.run` 生成 JSONL；需要配置模型 API 和自定义问题集 |
+| RQ1 WorkSurface-Bench 全量 | 还不能直接运行 | 缺 benchmark 数据适配、gold surface 解析、Route/Evidence 评分和多条件 sweep |
+| RQ2 WorkSurface-Build | 还不能直接运行 | 缺 Document/Table/Graph/Eager/Heuristic/DataMind-build 的统一 driver 和成本采集 |
+| RQ3 update/concurrency | 只能测核心原语 | 已有 SnapshotStore、candidate validation、publication 和 guard；缺四种 ablation runner、更新脚本和并发 driver |
+| RQ4 fault injection | 只能测局部路径 | 已有 MinerU→pypdf fallback 和结构化 tool errors；缺统一故障注入、结果归一化和 fault matrix runner |
+
+因此，在没有补齐实验 harness 前，不应把 smoke test 或单元测试写成论文结果。论文中的 RQ 表格只有在相应 adapter、driver 和 scorer 完成后才填入数字。
+
 ## DataMind 和 DataMind-build
 
 **DataMind** 是面向 tool-using agent 的 workspace data plane。它把同一组原始文件组织成 document、table、graph、memory 等 surface，并在 serving 时通过 manifest、profile、snapshot、receipt 和 revision 管理这些数据。Serving Agent 读取的是一个明确的 profile snapshot，因此可以知道数据来自哪个版本、哪个 source，以及结果是否可审计；如果内置 live-only provider 已经无法满足这个 snapshot，运行时会 fail-closed，而不是返回混合版本结果。
@@ -251,10 +264,10 @@ scripts/
 
 ## 执行顺序
 
-1. 用 20 个任务跑通所有条件和日志；
-2. 完成 RQ3/RQ4 的确定性测试；
-3. 用 GPT-4o-mini 做 RQ1/RQ2 smoke test；
-4. 锁定 prompt、model ID、tool schema、数据版本和 commit；
-5. 跑 RQ1 全量，再并行跑 RQ2、RQ3、RQ4；
-6. 跑 200-task 三重复 robustness；
-7. 自动生成最终表格和图。
+1. 先运行 `pytest -q`，确认代码和快照原语通过；
+2. 准备统一的 WorkSurface-Bench adapter、gold parser 和 Route/Evidence scorer；
+3. 实现 RQ2 的构建策略 driver，以及 RQ3/RQ4 的确定性 driver；
+4. 用 20 个任务跑通所有已实现条件和日志；
+5. 锁定 prompt、model ID、tool schema、数据版本和 commit；
+6. 跑 RQ1 全量，再并行跑 RQ2、RQ3、RQ4；
+7. 跑 200-task 三重复 robustness，自动生成最终表格和图。
