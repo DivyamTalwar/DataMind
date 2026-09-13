@@ -415,8 +415,8 @@ questions:
   answer quality, and efficiency?
   \item \textbf{RQ2}: What is the cost of building multiple surfaces, and when
   is that cost amortized by later queries?
-  \item \textbf{RQ3}: Do profile snapshots and ingestion receipts preserve
-  visibility, idempotence, and isolation under updates and concurrency?
+  \item \textbf{RQ3}: What latency, throughput, and memory overhead does DataMind
+  add under concurrent serving?
   \item \textbf{RQ4}: Can DataMind recover from surface and build failures
   without returning untraceable answers?
 \end{itemize}
@@ -486,22 +486,26 @@ aggregate score. This is the experiment that connects WorkSurface-Build to the
 DataMind claim: materialization is useful only when its cost produces durable
 serving value.
 
-\subsection{RQ3: Updates and concurrency}
+\subsection{RQ3: Runtime overhead and concurrency}
 \label{sec:eval-rq3}
 
-We apply additions, modifications, deletions, repeated ingestion, and changed
-dependency edges to a profile. Each update is followed by queries issued before,
-during, and after publication. We evaluate the current DataMind path as a
-black-box system: reads of surfaces touched by an active candidate must be
-blocked, publication must make the new logical revision visible, repeated writes
-must be idempotent, and profiles must remain isolated. Snapshot identifiers and
-receipts are retained in traces for diagnosis, but are not treated as separate
-quality conditions.
+RQ3 measures the system cost of DataMind's serving path. We run the same
+representative workload with the same model, prompt, tool schemas, and
+surface contents under two conditions. \emph{DataMind no-hooks} disables the
+PathAllowlist, destructive-SQL, and audit hooks while retaining the serving
+runtime. \emph{DataMind full} uses the default configuration, including hooks,
+evidence, snapshot metadata, and audit logging. If an external DB-GPT
+implementation can be reproduced with the same model and data, we report it as
+an additional reference; otherwise we do not attribute differences to an
+unmatched external system.
 
-Concurrent runs use 1, 5, 20, 50, and 100 sessions. We vary same-profile reads,
-cross-profile reads, concurrent writes, and mixed read/write workloads. We report
-blocked-read correctness, stale and mixed-snapshot outcomes, duplicate writes,
-lost updates, cross-profile leakage, throughput, and p50/p95/p99 latency.
+We run 60 or 200 tasks at concurrency 1, 5, 20, 50, and 100, with at least
+three repetitions per condition. We report errors, p50/p95/p99 end-to-end
+latency, QPS, peak RSS, tool calls, input/output tokens, and a model-versus-tool
+latency breakdown. QPS is completed tasks divided by wall-clock time. Error rate
+is reported separately from latency averages. The comparison quantifies the
+runtime cost of DataMind's policy, audit, evidence, and version metadata while
+holding model behavior constant.
 
 \subsection{RQ4: Failure recovery}
 \label{sec:eval-rq4}

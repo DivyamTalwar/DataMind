@@ -10,7 +10,7 @@
 | 通用 serving smoke test | 可直接运行 | `python -m benchmark.run` 生成 JSONL；需要配置模型 API 和自定义问题集 |
 | RQ1 WorkSurface-Bench 全量 | 还不能直接运行 | 缺 benchmark 数据适配、gold surface 解析、Route/Evidence 评分和多条件 sweep |
 | RQ2 WorkSurface-Build | 还不能直接运行 | 缺 Document/Table/Graph/Eager/Heuristic/DataMind-build 的统一 driver 和成本采集 |
-| RQ3 update/concurrency | 只能测核心原语 | 已有 SnapshotStore、candidate validation、publication 和 guard；缺四种 ablation runner、更新脚本和并发 driver |
+| RQ3 runtime performance | 可做 serving benchmark | 通用 runner 已有并发和 latency；缺 RSS 采集、no-hooks sweep 和结果聚合脚本 |
 | RQ4 fault injection | 只能测局部路径 | 已有 MinerU→pypdf fallback 和结构化 tool errors；缺统一故障注入、结果归一化和 fault matrix runner |
 
 因此，在没有补齐实验 harness 前，不应把 smoke test 或单元测试写成论文结果。论文中的 RQ 表格只有在相应 adapter、driver 和 scorer 完成后才填入数字。
@@ -23,7 +23,7 @@ RQ1--RQ4 不需要做成一套统一的大型实验平台，可以由不同同�
 |---|---|---|
 | RQ1 | `benchmark/run.py`、WorkSurface-Bench adapter、serving scorer | 否 |
 | RQ2 | ingest/build service、WorkSurface-Build workspace、成本统计 | 否；构建出的数据可选地复用于 RQ1 |
-| RQ3 | `SnapshotStore`、`IngestLedger`、更新脚本、并发 driver | 否 |
+| RQ3 | `benchmark/run.py`、hooks 配置、并发参数、进程资源监控 | 否 |
 | RQ4 | parser/DB/Graph fault injection、结构化错误日志 | 否 |
 
 每位同学只需要负责自己的 driver、结果表和最小验证脚本。不要为了实验去重构 DataMind 核心；如果必须修改共享 runtime，先保持接口兼容，并在自己的 RQ 目录下记录所需配置。最终只需把四组已经生成的表格和图汇总到论文中。
@@ -40,7 +40,7 @@ RQ1--RQ4 不需要做成一套统一的大型实验平台，可以由不同同�
 
 - RQ1：WorkSurface-Bench 全部 1,151 个任务，覆盖 RAG、Table、Graph、Cross-surface。
 - RQ2：对应的五个 persona workspace，从原始文件开始构建 surface。
-- RQ3/RQ4：固定 workspace、更新脚本和故障注入脚本。
+- RQ3：固定 serving workload 和并发度；RQ4：固定 workspace 和故障注入脚本。
 
 **模型**
 
@@ -139,30 +139,40 @@ Document-only 不是“只处理 .docx 文件”：CSV、XLSX、PDF 等输入也
 
 **图：** RQ2-Fig-A 累计成本摊平曲线；RQ2-Fig-B 构建时间分解；RQ2-Fig-C quality–cost frontier。
 
-## RQ3：snapshot、receipt 和 profile isolation 是否成立？
+## RQ3：DataMind 的运行时开销和并发性能
 
-**运行：** 更新类型为 add、modify、delete、replay、concurrent update、partial failure；并发客户端为 1、5、20、50、100；工作负载包括 same-profile read、cross-profile read、concurrent write、80/20 read-write、50/50 read-write。
+RQ3 不再比较 Mutable/Ledger-only/Snapshot-only，也不把 snapshot 或 receipt
+作为独立变量。它只测 DataMind 在相同任务和相同模型下的端到端系统代价。
 
-RQ3 不再做 Mutable/Ledger-only/Snapshot-only 的机制 ablation。只运行当前
-DataMind 路径，验证更新和并发场景下的黑盒行为：候选更新期间相关 surface
-是否被阻断，发布后新版本是否可见，重复写是否幂等，以及不同 profile 是否
-相互隔离。Snapshot 和 receipt 只作为实现内部的版本与审计字段，不单独比较。
+**条件：**
 
-**指标：** visibility delay、blocked-read correctness、stale-read、mixed-snapshot、
-duplicate-write、lost-update、cross-profile leakage、throughput、p50/p95/p99
-latency。
+| 条件 | 含义 |
+|---|---|
+| DataMind no-hooks | DataMind 完整 serving path，但关闭 PathAllowlist、DestructiveSQL 和 AuditLog hooks |
+| DataMind full | 当前默认配置，启用 hooks、evidence、snapshot metadata 和审计路径 |
+| DB-GPT（可选） | 只有在能用同一模型、同一任务和同一数据稳定复现时才加入；否则不强行比较外部系统 |
+
+`DataMind no-hooks` 和 `DataMind full` 使用同一组 surface、同一模型、同一
+prompt、同一 tool schema 和同一并发度。这样测到的是 DataMind 的安全、审计和
+版本语义带来的运行时开销，而不是模型差异。
+
+**运行：** 固定 60 或 200 个代表性任务，分别使用并发度 1、5、20、50、100
+运行；记录成功、错误和超时。每个条件至少重复三次。QPS 由完成任务数除以
+wall-clock time 计算；峰值 RSS 用进程监控工具记录。
+
+**指标：** Errors、p50/p95/p99 end-to-end latency、QPS、Peak RSS、tool calls、
+input/output tokens 和 model/tool latency 分解。错误率单独报告，不与延迟平均。
 
 **Table RQ3：**
 
-| Scenario | Expected behavior | Correctness | Visibility Delay | Duplicate Writes | Leakage | Throughput | p95 |
-|---|---|---:|---:|---:|---:|---:|---:|
-| Add/modify/delete |  |  |  |  |  |  |  |
-| Replay same write |  |  |  |  |  |  |  |
-| Active candidate read |  |  |  |  |  |  |  |
-| Concurrent read/write |  |  |  |  |  |  |  |
-| Cross-profile read |  |  |  |  |  |  |  |
+| System | N | Errors ↓ | p50 ms ↓ | p95 ms ↓ | p99 ms ↓ | QPS ↑ | Peak RSS MB ↓ |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| DataMind no-hooks |  |  |  |  |  |  |  |
+| DataMind full |  |  |  |  |  |  |  |
+| DB-GPT (optional) |  |  |  |  |  |  |  |
 
-**图：** RQ3-Fig-A publication timeline；RQ3-Fig-B throughput–latency curve；RQ3-Fig-C profile isolation heatmap。
+**图：** RQ3-Fig-A latency CDF；RQ3-Fig-B throughput–concurrency 曲线；RQ3-Fig-C
+latency breakdown（model、tool、hooks、serialization）。
 
 ## RQ4：故障时能否恢复且保持可审计？
 
@@ -234,7 +244,7 @@ scripts/
 
 - 同学 A：RQ1，benchmark adapter、serving sweep、Route/Evidence/Answer 评分。
 - 同学 B：RQ2，WorkSurface-Build、构建策略、MinerU/pypdf、成本和摊平曲线。
-- 同学 C：RQ3，snapshot、ledger、并发 driver、profile isolation。
+- 同学 C：RQ3，no-hooks/full serving sweep、并发运行、latency/QPS/RSS 统计。
 - 同学 D：RQ4，fault injection、fallback、rollback、receipt audit。
 
 统一日志 schema、统计和表格格式由四组共同遵守。
