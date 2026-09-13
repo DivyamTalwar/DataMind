@@ -277,16 +277,33 @@ corresponding ingestion path is DataMind-Build, shown in
 Figure~\ref{fig:datamind-build}; it is the Build Agent and its publication
 pipeline, not a second product or a different data model.
 
-\begin{figure*}[t]
-\centering
-\includegraphics[width=0.94\textwidth]{figures/datamind_overview_v2.pdf}
-\caption{DataMind serving path. The Serving Agent routes a request over
-profile-scoped document, database, graph, memory, and skill surfaces and
+\clearpage
+\onecolumn
+\begin{center}
+\includegraphics[width=0.84\textwidth]{figures/datamind_overview_v2.pdf}
+\captionof{figure}{DataMind serving path. The Serving Agent routes a request
+over profile-scoped document, database, graph, memory, and skill surfaces and
 returns an answer with evidence. The profile, policy, revision, and receipt
 interfaces are shared with DataMind-Build.}
 \label{fig:datamind-overview}
-\Description{DataMind architecture showing DataMind-Build materializing workspace artifacts into document, database, and graph surfaces, while the Serving Agent routes requests over a published profile snapshot that also includes runtime memory.}
-\end{figure*}
+\end{center}
+
+\clearpage
+
+\begin{center}
+\includegraphics[width=0.84\textwidth]{figures/datamind_build_agent_generated.png}
+\captionof{figure}{DataMind-Build ingestion path. The Build Agent inventories
+a profile's workspace, plans surface candidates, parses and normalizes sources,
+projects records, validates candidate revisions, and publishes a profile
+snapshot. The candidate descriptor remains unpublished until validation; reads
+of touched surfaces are blocked during candidate assembly, and providers that
+do not support historical artifacts fail closed if a pinned request becomes
+stale.}
+\label{fig:datamind-build}
+\end{center}
+
+\clearpage
+\twocolumn
 
 \subsection{Workspace-to-surface materialization}
 \label{sec:build-agent}
@@ -299,21 +316,6 @@ is retained as a deterministic fallback. Tables are normalized into rows and
 columns, while source and dependency files can contribute graph entities and
 edges. The parser choice is recorded because changing a parser can change a
 surface revision even when the source checksum is unchanged.
-
-\begin{figure*}[t]
-\centering
-\includegraphics[width=0.94\textwidth]{figures/datamind_build_agent_generated.png}
-\caption{DataMind-Build ingestion path. The Build Agent inventories a profile's
-workspace, plans surface candidates, parses and normalizes sources, projects
-records, validates candidate revisions, and publishes a profile snapshot. The
-candidate descriptor remains unpublished until validation; reads of touched
-surfaces are blocked during candidate assembly, and providers that do not
-support historical artifacts fail closed if a pinned request becomes stale.}
-\label{fig:datamind-build}
-\Description{DataMind-Build pipeline from workspace sources through inspection,
-parsing, surface projection, validation and receipts, to publication of a
-profile snapshot consumed by the Serving Agent.}
-\end{figure*}
 
 The next stage projects the extracted blocks into one or more physical
 surfaces. Document blocks are chunked and indexed for hybrid retrieval. Tables
@@ -507,7 +509,7 @@ injected failures cannot identify their effects. If the full system improves
 answer quality but increases unnecessary exploration, the additional tool and
 token measurements make that trade-off explicit.
 
-\begin{table}[t]
+\begin{table*}[t]
 \centering\footnotesize
 \setlength{\tabcolsep}{3.5pt}
 \caption{RQ1 main serving results on WorkSurface-Bench.}
@@ -527,7 +529,7 @@ GPT-5.5 & ReAct-all & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 GPT-5.5 & DataMind-full & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 \bottomrule
 \end{tabular}}
-\end{table}
+\end{table*}
 
 \begin{table}[t]
 \centering\footnotesize
@@ -587,7 +589,7 @@ aggregate score. This is the experiment that connects WorkSurface-Build to the
 DataMind claim: materialization is useful only when its cost produces durable
 serving value.
 
-\begin{table}[t]
+\begin{table*}[t]
 \centering\footnotesize
 \setlength{\tabcolsep}{3.5pt}
 \caption{RQ2 build cost and materialization coverage.}
@@ -605,7 +607,7 @@ Heuristic-demand & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 DataMind-build & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 \bottomrule
 \end{tabular}}
-\end{table}
+\end{table*}
 
 \begin{table}[t]
 \centering\footnotesize
@@ -663,14 +665,14 @@ is reported separately from latency averages. The comparison quantifies the
 runtime cost of DataMind's policy, audit, evidence, and version metadata while
 holding model behavior constant.
 
-\begin{table}[t]
+\begin{table*}[t]
 \centering\footnotesize
-\setlength{\tabcolsep}{3.5pt}
+\setlength{\tabcolsep}{6pt}
 \caption{RQ3 end-to-end latency, throughput, and memory under concurrency.
 Concurrency-one values are the pilot measurements from the earlier report;
 the remaining rows are reserved for the controlled rerun.}
 \label{tab:rq3-runtime}
-\resizebox{\linewidth}{!}{%
+\resizebox{0.94\textwidth}{!}{%
 \begin{tabular}{@{}llrrrrrrr@{}}
 \toprule
 System & Concurrency & $N$ & Errors$\downarrow$ & p50 ms$\downarrow$ & p95 ms$\downarrow$ & p99 ms$\downarrow$ & QPS$\uparrow$ & Peak RSS MB$\downarrow$ \\
@@ -684,7 +686,7 @@ DataMind full & 100 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 DB-GPT (optional) & 1 & 60 & 0 & 7164.1 & 11660.2 & 13839.5 & 0.1297 & 194.0 \\
 \bottomrule
 \end{tabular}}
-\end{table}
+\end{table*}
 
 \subsection{RQ4: Failure recovery}
 \label{sec:eval-rq4}
@@ -706,12 +708,12 @@ Surface outages and stale-provider blocks are counted as explicit failures,
 not as successful fallbacks. This prevents the recovery experiment from
 rewarding a model for guessing after a source outage.
 
-\begin{table}[t]
+\begin{table*}[t]
 \centering\footnotesize
-\setlength{\tabcolsep}{3.2pt}
+\setlength{\tabcolsep}{6pt}
 \caption{RQ4 recovery after injected surface and build faults.}
 \label{tab:rq4-faults}
-\resizebox{\linewidth}{!}{%
+\resizebox{0.94\textwidth}{!}{%
 \begin{tabular}{@{}llrrrrrr@{}}
 \toprule
 Fault & System & Completion & Answer & Auditable & Structured error & Fallback/block & Recovery ms \\
@@ -726,15 +728,15 @@ Graph unavailable & Retry-only & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 Graph unavailable & DataMind-full & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 \bottomrule
 \end{tabular}}
-\end{table}
+\end{table*}
 
-\begin{table}[t]
+\begin{table*}[t]
 \centering\footnotesize
 \setlength{\tabcolsep}{3pt}
 \caption{Pilot recovery results from the earlier report. The denominator is
 the affected recoverable slice for each injected fault.}
 \label{tab:rq4-recovery-pilot}
-\resizebox{\linewidth}{!}{%
+\resizebox{0.94\textwidth}{!}{%
 \begin{tabular}{@{}lrrrrr@{}}
 \toprule
 System & KB empty & Graph down & DB timeout & Partial corruption & Overall \\
@@ -743,18 +745,18 @@ Fixed pipeline & 0.0\% (0) & 0.0\% (0) & 0.0\% (0) & 0.0\% (0) & 0.0\% (0) \\
 DataMind live & 60.0\% (3) & 60.7\% (17) & 70.6\% (12) & 62.5\% (25) & 63.3\% (57) \\
 \bottomrule
 \end{tabular}}
-\end{table}
+\end{table*}
 
 The following two diagnostics preserve the earlier report's scope-isolation
 and tool-policy experiments. They are reported as correctness checks rather
 than as additional claims about the serving quality benchmark.
 
-\begin{table}[t]
+\begin{table*}[t]
 \centering\footnotesize
 \caption{Pilot profile-scoped memory isolation diagnostic from the earlier
 report.}
 \label{tab:rq4-memory}
-\resizebox{\linewidth}{!}{%
+\resizebox{0.94\textwidth}{!}{%
 \begin{tabular}{@{}lrrrrr@{}}
 \toprule
 Setting & Memory leakage$\downarrow$ & Memory recall$\uparrow$ & Answer leakage$\downarrow$ & Answer recall$\uparrow$ & Mixed answer$\downarrow$ \\
@@ -763,7 +765,7 @@ Flat namespace & 30\% & 70\% & 68\% & 31\% & 63\% \\
 DataMind three-scope & 0\% & 100\% & 0\% & 100\% & 0\% \\
 \bottomrule
 \end{tabular}}
-\end{table}
+\end{table*}
 
 \begin{table}[t]
 \centering\footnotesize
