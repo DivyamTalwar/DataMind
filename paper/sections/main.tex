@@ -443,24 +443,22 @@ the corresponding end-to-end path is included in the experiments.
 \section{Evaluation}
 \label{sec:experiments}
 
-The evaluation follows one artifact lineage rather than four independent
-benchmarks. We first build a workspace and publish a versioned snapshot; the
-Serving Agent answers WorkSurface-Bench requests against that snapshot; we then
-mutate the source or fail a provider while the same lineage is active; finally,
-we replay the serving workload at controlled concurrency. This makes the
-causal dependencies explicit: RQ2 produces the artifact consumed by RQ1, RQ3
-checks whether that artifact remains correct through its lifecycle, and RQ4
-measures the cost of serving it.
+The evaluation follows the actual DataMind workflow: build heterogeneous
+workspace surfaces, serve benchmark requests, measure serving efficiency, and
+inject component failures to test stability. RQ1 and RQ2 establish quality and
+build value; RQ3 and RQ4 then use the same built workspace to measure runtime
+cost and behavior under failure. This ordering keeps the experiments connected
+without making publication metadata an experimental variable.
 
 \begin{itemize}
-  \item \textbf{RQ1}: On a fixed published snapshot, does surface-aware
-  serving improve route, evidence, answer quality, and efficiency?
+  \item \textbf{RQ1}: On the same built surfaces, does surface-aware serving
+  improve route, evidence, answer quality, and tool efficiency?
   \item \textbf{RQ2}: What does it cost to materialize the surfaces, and when
-  is the build cost amortized by subsequent queries?
-  \item \textbf{RQ3}: Under source updates and component failures, are revision,
-  provenance, profile isolation, and safety boundaries preserved?
-  \item \textbf{RQ4}: What latency, throughput, memory, and hook overhead does
-  managed serving add under concurrency?
+  is that build cost amortized by subsequent queries?
+  \item \textbf{RQ3}: What latency, throughput, memory, and management-hook
+  overhead does DataMind add under concurrent serving?
+  \item \textbf{RQ4}: When parsers, databases, graphs, or embeddings fail, does
+  DataMind fail safely or recover with the required evidence?
 \end{itemize}
 
 \subsection{Workloads and baselines}
@@ -477,16 +475,16 @@ only as upper bounds.
 We compare DataMind with the benchmark's no-tool, document-only,
 single-surface, and all-tools ReAct settings. We also implement a simple
 manifest router that receives the same surface descriptions but does not use
-DataMind's snapshot, evidence, or receipt path. All comparisons use the same
+DataMind's management and evidence path. All comparisons use the same
 model backbone, prompt budget, tool schemas, task order, and temperature. The
 backbone sweep follows WorkSurface-Bench (GPT-4o-mini, DeepSeek-V4-Pro,
 Gemini-3.1-Pro, and GPT-5.5); the DataMind build and dynamic-system studies
 fix GPT-5.5 to isolate data-plane effects. We report repeated-run means and
 confidence intervals rather than a single trajectory.
-Every result records the workspace checksum, profile, published snapshot, and
-revision consumed by the task. The build, lifecycle, and runtime experiments
-reuse these identifiers so that a quality result cannot silently come from a
-different materialization.
+Every result records the workspace checksum, build identifier, configured
+surfaces, and task-level trace. RQ1, RQ3, and RQ4 reuse the same built workspace
+and task order so that quality, efficiency, and stability are measured on a
+common input.
 
 We additionally retain the two external systems from the earlier report as
 matched-subset baselines. DB-GPT is evaluated on database and structured-query
@@ -507,13 +505,11 @@ analysis separates single-surface and cross-surface tasks. This distinction
 prevents a system from appearing efficient merely because it avoids the hard
 cases that require evidence from more than one surface.
 
-RQ1 reports serving quality, routing behavior, evidence coverage, and runtime
-cost under a fixed single-version workspace. Snapshot publication and parser
-fallback are evaluated in the dynamic update and fault-injection experiments,
-respectively, because a static benchmark with one valid revision and no
-injected failures cannot identify their effects. If the full system improves
-answer quality but increases unnecessary exploration, the additional tool and
-token measurements make that trade-off explicit.
+RQ1 reports serving quality, routing behavior, evidence coverage, and tool
+cost on the same built workspace. Fault handling is kept out of this static
+score and measured separately in RQ4. If the full system improves answer
+quality but increases unnecessary exploration, the additional tool and token
+measurements make that trade-off explicit.
 
 \begin{table*}[t]
 \centering\footnotesize
@@ -579,8 +575,7 @@ used by a fixed Worker. We compare document-only, database-only, graph-only,
 an unmanaged all-surface build, heuristic demand selection, and DataMind's
 managed build. The unmanaged all-surface condition uses the same configured
 document, database, and graph surfaces, parsers, and physical backends as
-DataMind but omits manifest-driven validation, receipts, snapshot publication,
-and revision management. Build metrics include wall clock time, parser and
+DataMind but omits DataMind's build-time orchestration and provenance checks. Build metrics include wall clock time, parser and
 embedding calls, storage, source coverage, provenance
 completeness, duplicate handling, and failed-stage recovery. After each build,
 the same Worker answers the serving workload so that materialization quality is
@@ -654,33 +649,70 @@ DB-GPT & built-in & Qwen v4 & 0.9834 & 0.9980 & 0.9785 \\
 \end{tabular}
 \end{table}
 
-\subsection{RQ3: Lifecycle correctness under updates and failures}
+\subsection{RQ3: Serving efficiency}
 \label{sec:eval-rq3}
 
-RQ3 tests the claim that a workspace data plane has a lifecycle, rather than
-only a set of retrieval endpoints. We compare two executions over the same raw
-workspace and serving task trace. A \emph{direct mutable pipeline} writes
-candidate data directly into live backends and lets readers observe whatever
-state is present. \emph{DataMind-managed} builds a candidate, validates it,
-publishes a snapshot, and pins each request to that published revision; profile
-and destructive-operation guards return structured failures when the required
-boundary cannot be maintained.
+RQ3 measures DataMind's runtime cost on the same built workspace and task set
+used for RQ1. We hold the model, prompt, tool schema, task order, and surface
+contents constant. \emph{DataMind no-hooks} retains the serving path while
+disabling policy and audit hooks; \emph{DataMind full} enables the default
+hooks, evidence bookkeeping, and audit path. DB-GPT and RAGFlow are included
+only on matched database or document subsets with the same model, data,
+questions, and output budget.
 
-We inject source-update/read overlap, MinerU or parser and embedding failures,
-database and SQL timeout/connection/schema failures, graph unavailability, and
-corrupted artifacts. We also replay the existing profile-memory isolation and
-SQL-policy probes as diagnostics of the same boundary. The primary measures
-are stale or mixed reads, correct-revision rate, auditable-answer rate,
-structured-error accuracy, fallback/block correctness, recovery time, memory
-leakage, and unsafe execution. An answer is counted as recovered only when it
-meets the task requirement, cites valid evidence, and names the correct
-revision; guessing a plausible answer is not recovery.
+We run 60 or 200 tasks at concurrency 1, 5, 20, 50, and 100, with at least
+three repetitions per condition. We report errors, p50/p95/p99 end-to-end
+latency, QPS, peak RSS, tool calls, tokens, and model/tool/hook latency
+breakdowns. This isolates the cost of DataMind's serving and management path
+without confusing it with answer-quality differences.
 
 \begin{table*}[t]
 \centering\footnotesize
 \setlength{\tabcolsep}{6pt}
-\caption{RQ3 lifecycle correctness after updates and injected surface faults.}
-\label{tab:rq3-lifecycle}
+\caption{RQ3 end-to-end latency, throughput, and memory under concurrency.
+Concurrency-one values are the pilot measurements from the earlier report;
+the remaining rows are reserved for the controlled rerun.}
+\label{tab:rq3-runtime}
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\resizebox{0.90\textwidth}{!}{%
+\begin{tabular}{@{}llrrrrrrr@{}}
+\toprule
+System & Concurrency & $N$ & Errors$\downarrow$ & p50 ms$\downarrow$ & p95 ms$\downarrow$ & p99 ms$\downarrow$ & QPS$\uparrow$ & Peak RSS MB$\downarrow$ \\
+\midrule
+DataMind no-hooks & 1 & 60 & 2 & 9373.8 & 18329.4 & 24302.7 & 0.0917 & 193.5 \\
+DataMind full & 1 & 60 & 2 & 8458.0 & 15413.4 & 19560.0 & 0.1012 & 188.1 \\
+DataMind no-hooks & 20 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+DataMind full & 20 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+DataMind no-hooks & 100 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+DataMind full & 100 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+DB-GPT (optional) & 1 & 60 & 0 & 7164.1 & 11660.2 & 13839.5 & 0.1297 & 194.0 \\
+\bottomrule
+\end{tabular}}
+\end{table*}
+
+\subsection{RQ4: Stability under component failures}
+\label{sec:eval-rq4}
+
+RQ4 probes whether the serving and build paths remain controllable when a
+component is unavailable. On the same built workspace and deterministic task
+set, we inject MinerU/parser timeouts, embedding outages, empty retrieval,
+database and SQL timeouts, connection or schema failures, graph unavailability,
+corrupted artifacts, and interrupted builds. Each fault has a predeclared
+expected behavior: parser fallback, retry, structured error, or explicit block.
+
+We compare DataMind with a retry-only/direct baseline and, where the protocol
+can be matched, DB-GPT or RAGFlow. We report completion, correct answer,
+valid evidence, structured-error accuracy, fallback/block correctness,
+recovery time, and unsafe answer or execution rate. A recovery is successful
+only when the task requirement and evidence requirement are both met; a lucky
+answer after a component failure is not stability.
+
+\begin{table*}[t]
+\centering\footnotesize
+\setlength{\tabcolsep}{6pt}
+\caption{RQ4 stability after injected component failures.}
+\label{tab:rq4-faults}
 \scriptsize
 \setlength{\tabcolsep}{4pt}
 \resizebox{0.90\textwidth}{!}{%
@@ -688,14 +720,10 @@ revision; guessing a plausible answer is not recovery.
 \toprule
 Event & System & Completion & Answer & Auditable & Structured error & Fallback/block & Recovery ms \\
 \midrule
-Source update/read overlap & Direct mutable & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
-Source update/read overlap & DataMind-full & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 Parser/MinerU failure & Direct mutable & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 Parser/MinerU failure & DataMind-full & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 Database/SQL timeout & Direct mutable & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 Database/SQL timeout & DataMind-full & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
-Active candidate read & Direct mutable & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
-Active candidate read & DataMind-full & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 Graph unavailable & Direct mutable & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 Graph unavailable & DataMind-full & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 \bottomrule
@@ -707,7 +735,7 @@ Graph unavailable & DataMind-full & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
 \setlength{\tabcolsep}{3pt}
 \caption{Pilot recovery results from the earlier report. The denominator is
 the affected recoverable slice for each injected fault.}
-\label{tab:rq3-recovery-pilot}
+\label{tab:rq4-recovery-pilot}
 \scriptsize
 \setlength{\tabcolsep}{4pt}
 \resizebox{0.82\textwidth}{!}{%
@@ -729,7 +757,7 @@ than as additional claims about the serving quality benchmark.
 \centering\footnotesize
 \caption{Pilot profile-scoped memory isolation diagnostic from the earlier
 report.}
-\label{tab:rq3-memory}
+\label{tab:rq4-memory}
 \scriptsize
 \setlength{\tabcolsep}{4pt}
 \resizebox{0.82\textwidth}{!}{%
@@ -747,7 +775,7 @@ DataMind three-scope & 0\% & 100\% & 0\% & 100\% & 0\% \\
 \centering\footnotesize
 \caption{Pilot tool-dispatch SQL policy diagnostic from the earlier report.
 Ask-user decisions count as blocked until confirmation.}
-\label{tab:rq3-policy}
+\label{tab:rq4-policy}
 \begin{tabular}{@{}lrrr@{}}
 \toprule
 System & Unsafe recall$\uparrow$ & FP rate$\downarrow$ & Recall--FP$\uparrow$ \\
@@ -762,54 +790,15 @@ DataMind hooks & 100\% & 0\% & 100\% \\
 
 
 
-\subsection{RQ4: Runtime overhead and concurrency}
-\label{sec:eval-rq4}
 
-RQ4 uses the fixed snapshot and serving workload from RQ1. The only controlled
-change is the serving path: \emph{DataMind no-hooks} retains the same model,
-surface contents, prompt, and tool schema while disabling policy and audit
-hooks; \emph{DataMind full} enables the default hooks, evidence metadata,
-snapshot selection, and audit path. An external system is included only when
-its model, data, task set, and decoding budget are matched.
-
-We run 60 or 200 tasks at concurrency 1, 5, 20, 50, and 100, with at least
-three repetitions per condition. We report errors, p50/p95/p99 end-to-end
-latency, QPS, peak RSS, tool calls, tokens, and a model/tool/hooks latency
-breakdown. This isolates the runtime cost of DataMind's management semantics;
-it does not reinterpret the old single-concurrency pilot as a quality result.
-
-\begin{table*}[t]
-\centering\footnotesize
-\setlength{\tabcolsep}{6pt}
-\caption{RQ4 end-to-end latency, throughput, and memory under concurrency.
-Concurrency-one values are the pilot measurements from the earlier report;
-the remaining rows are reserved for the controlled rerun.}
-\label{tab:rq4-runtime}
-\scriptsize
-\setlength{\tabcolsep}{4pt}
-\resizebox{0.90\textwidth}{!}{%
-\begin{tabular}{@{}llrrrrrrr@{}}
-\toprule
-System & Concurrency & $N$ & Errors$\downarrow$ & p50 ms$\downarrow$ & p95 ms$\downarrow$ & p99 ms$\downarrow$ & QPS$\uparrow$ & Peak RSS MB$\downarrow$ \\
-\midrule
-DataMind no-hooks & 1 & 60 & 2 & 9373.8 & 18329.4 & 24302.7 & 0.0917 & 193.5 \\
-DataMind full & 1 & 60 & 2 & 8458.0 & 15413.4 & 19560.0 & 0.1012 & 188.1 \\
-DataMind no-hooks & 20 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
-DataMind full & 20 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
-DataMind no-hooks & 100 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
-DataMind full & 100 & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
-DB-GPT (optional) & 1 & 60 & 0 & 7164.1 & 11660.2 & 13839.5 & 0.1297 & 194.0 \\
-\bottomrule
-\end{tabular}}
-\end{table*}
 
 \subsection{Measurement protocol}
 \label{sec:eval-protocol}
 
 The same task-level trace format is used across all questions. Build records
-its input checksum and published snapshot; serving records accessed surfaces,
-evidence, revision, calls, tokens, and latency; lifecycle runs additionally
-record the injected event and the expected block or fallback. Thus the tables
+its input checksum and configured surfaces; serving records accessed surfaces,
+evidence, calls, tokens, and latency; stability runs additionally record the
+injected event and the expected block or fallback. Thus the tables
 report different projections of the same execution lineage, rather than
 post-hoc aggregates collected with incompatible conditions.
 
