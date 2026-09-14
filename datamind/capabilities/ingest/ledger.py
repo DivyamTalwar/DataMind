@@ -150,7 +150,7 @@ class IngestLedger:
         args: dict[str, Any],
         invoke: Callable[..., Awaitable[Any]],
     ) -> dict[str, Any]:
-        """Invoke one write once and always return a structured receipt."""
+        """Deduplicate retryable imports, but always apply explicit DB replacement."""
         source = _source_from_call(spec, args)
         fingerprint = _hash_text(
             _canonical(
@@ -168,7 +168,16 @@ class IngestLedger:
         async with self._lock:
             state = self._load_state()
             previous = state["successful"].get(fingerprint)
-            if previous:
+            # A receipt proves that these arguments succeeded in the past, not
+            # that the target table still contains those rows. Replacements
+            # must execute even for A -> B -> A (or an out-of-band DB change).
+            # Reapplying replace is safe from duplicate appends; append/fail
+            # imports retain their existing receipt-based retry behavior.
+            replaces_table = (
+                spec.name in {"db_import_records", "db_import_csv", "db_import_path"}
+                and args.get("if_exists") == "replace"
+            )
+            if previous and not replaces_table:
                 receipt = IngestReceipt(
                     profile=self._profile,
                     revision=int(state["revision"]),
