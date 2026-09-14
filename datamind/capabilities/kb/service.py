@@ -149,6 +149,30 @@ class KBService:
             await rebuild()
         return stats
 
+    def record_incremental_ingest(self) -> None:
+        """Record compatibility metadata after an incremental KB write.
+
+        ``IngestService`` writes chunks directly to the live vector store for
+        low-latency file ingestion. Keep the same manifest contract as a full
+        reindex so a fresh process can safely reopen the resulting index.
+        """
+        if self.manifest_path is None:
+            return
+        manifest = build_index_manifest(
+            data_dir=self.data_dir,
+            embedding_provider=str(self._manifest_base.get("embedding_provider", self.embedding.name)),
+            embedding_model=str(self._manifest_base.get("embedding_model", "unknown")),
+            dimension=int(self.embedding.dimension),
+            chunk_size=self.retrieval_cfg.chunk_size,
+            chunk_overlap=self.retrieval_cfg.chunk_overlap,
+        )
+        write_manifest_atomic(self.manifest_path, manifest)
+        self._manifest_base = {
+            key: manifest[key]
+            for key in ("embedding_provider", "embedding_model", "dimension", "chunk_size", "chunk_overlap", "corpus_hash")
+        }
+        self._compatibility_error = None
+
     async def aclose(self) -> None:
         close = getattr(self.vector_store, "aclose", None)
         if callable(close):

@@ -118,6 +118,21 @@ TOOLS: dict[str, dict[str, Any]] = {
         "inputSchema": {"type": "object", "properties": {"profile": {"type": "string", "default": "default"}}}},
 }
 
+# MCP hosts use these hints to distinguish harmless inspection from operations
+# that need confirmation. Keep write-capable tools unannotated so Codex retains
+# its normal approval gate for ingestion and mutation.
+READ_ONLY_TOOLS = {
+    "datamind_raw_file_read",
+    "datamind_build_status",
+    "datamind_workspace_inspect",
+    "datamind_ask",
+    "datamind_build_verify",
+    "datamind_rag_query",
+    "datamind_graph_query",
+    "datamind_list_profiles",
+    "datamind_status",
+}
+
 def profile_name(args: dict[str, Any]) -> str:
     value = str(args.get("profile") or "default").strip()
     allowed = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.-"
@@ -227,7 +242,18 @@ def handle(message: dict[str, Any]) -> dict[str, Any] | None:
         if method == "ping":
             return rpc_result(request_id, {})
         if method == "tools/list":
-            return rpc_result(request_id, {"tools": [{"name": name, **spec} for name, spec in TOOLS.items()]})
+            listed: list[dict[str, Any]] = []
+            for name, spec in TOOLS.items():
+                item = {"name": name, **spec}
+                if name in READ_ONLY_TOOLS:
+                    item["annotations"] = {
+                        "readOnlyHint": True,
+                        "destructiveHint": False,
+                        "idempotentHint": True,
+                        "openWorldHint": False,
+                    }
+                listed.append(item)
+            return rpc_result(request_id, {"tools": listed})
         if method == "tools/call":
             name = str(params.get("name") or "")
             if name == "datamind_list_profiles":

@@ -2,8 +2,20 @@ from pathlib import Path
 
 import pytest
 
-from datamind.capabilities.ingest.service import IngestService
+from datamind.capabilities.ingest.service import IngestService, _infer_table_name
 from datamind.core.errors import CapabilityError
+
+
+@pytest.mark.parametrize(
+    ("stem", "expected"),
+    [
+        ("03-customers-2026", "t_03_customers_2026"),
+        ("sales-pipeline-q2", "sales_pipeline_q2"),
+        ("", "table"),
+    ],
+)
+def test_infer_table_name_normalizes_filename_stems(stem: str, expected: str):
+    assert _infer_table_name(stem) == expected
 
 
 class _Model:
