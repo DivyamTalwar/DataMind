@@ -25,7 +25,7 @@
 
 <p align="center"><sub>StoreAgent 负责写入；RetrieveAgent 跨数据面取证并回答。</sub></p>
 
-> **v1.0.0** —— native + 本地 profile 存储是稳定基线；SDK/CCR 和远程数据库属于集成路径，请在目标环境中验证。
+> **v1.1.0** —— native + 本地 profile 存储是稳定基线；SDK/CCR 和远程数据库属于集成路径，请在目标环境中验证。
 
 ## Workspace Build 与多格式入库
 

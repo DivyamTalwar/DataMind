@@ -25,7 +25,7 @@
 
 <p align="center"><sub>StoreAgent writes on the warm path. RetrieveAgent reads across the shared data plane and returns evidence.</sub></p>
 
-> **v1.0.0** — stable native backend + local profile storage. SDK/CCR and remote database adapters are supported integration paths; validate them in your own environment.
+> **v1.1.0** — stable native backend + local profile storage. SDK/CCR and remote database adapters are supported integration paths; validate them in your own environment.
 
 ## The idea
 

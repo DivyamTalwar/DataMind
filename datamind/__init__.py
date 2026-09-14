@@ -6,4 +6,4 @@ and `server.py` paths remain available for integration and migration work.
 Prefer `datamind.*` for new code.
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"

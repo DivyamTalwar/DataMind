@@ -4,7 +4,7 @@ All notable changes to DataMind are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and releases follow
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.1.0] - 2026-09-14
 
 ### Added
 
@@ -70,6 +70,7 @@ All notable changes to DataMind are documented here. The format follows
 The previous preview release. Its release note is retained in git history; the
 v1.0.0 release note is now the canonical public release summary.
 
-[Unreleased]: https://github.com/OpenDCAI/DataMind/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/OpenDCAI/DataMind/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/OpenDCAI/DataMind/releases/tag/v1.1.0
 [1.0.0]: https://github.com/OpenDCAI/DataMind/releases/tag/v1.0.0
 [0.3.0]: https://github.com/OpenDCAI/DataMind/releases/tag/0.3.0
