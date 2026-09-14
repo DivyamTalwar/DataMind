@@ -137,7 +137,54 @@ main {
   background: var(--surface);
   border: 1px solid var(--border);
   border-bottom-left-radius: 3px;
+  white-space: normal;
 }
+.bubble.assistant p { margin: 0 0 10px; white-space: pre-wrap; }
+.bubble.assistant p:last-child { margin-bottom: 0; }
+.bubble.assistant h1,
+.bubble.assistant h2,
+.bubble.assistant h3,
+.bubble.assistant h4,
+.bubble.assistant h5,
+.bubble.assistant h6 { margin: 12px 0 8px; line-height: 1.3; }
+.bubble.assistant h1:first-child,
+.bubble.assistant h2:first-child,
+.bubble.assistant h3:first-child { margin-top: 0; }
+.bubble.assistant h1 { font-size: 1.45em; }
+.bubble.assistant h2 { font-size: 1.28em; }
+.bubble.assistant h3 { font-size: 1.14em; }
+.bubble.assistant ul,
+.bubble.assistant ol { margin: 6px 0 10px; padding-left: 24px; }
+.bubble.assistant li { margin: 3px 0; }
+.bubble.assistant code {
+  background: var(--surface3);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+.bubble.assistant > pre {
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  white-space: pre;
+}
+.bubble.assistant > pre code { padding: 0; background: transparent; }
+.bubble.assistant blockquote {
+  margin: 8px 0 10px;
+  padding: 4px 12px;
+  border-left: 3px solid var(--accent-light);
+  color: var(--text2);
+}
+.markdown-table { margin: 8px 0 12px; overflow-x: auto; }
+.markdown-table table { border-collapse: collapse; min-width: 100%; }
+.markdown-table th,
+.markdown-table td { padding: 7px 10px; border: 1px solid var(--border); text-align: left; }
+.markdown-table th { background: var(--surface2); font-weight: 650; }
+.markdown-table tr:nth-child(even) td { background: rgba(255,255,255,.018); }
 .bubble.assistant .caret {
   display: inline-block;
   width: 8px;
@@ -611,6 +658,7 @@ main {
   </aside>
 </main>
 
+<script src="/static/markdown.js"></script>
 <script>
 // ────────────────────────────────────────────────────────
 // State
@@ -826,11 +874,8 @@ function appendText(bubble, text) {
 }
 
 function renderMarkdown(bubble) {
-  // Lightweight inline markdown: ` ` for inline code, **bold**, line breaks.
   const raw = bubble.dataset.raw || '';
-  const html = escapeHtml(raw)
-    .replace(/`([^`\n]+)`/g, '<code style="background: var(--surface3); padding: 1px 4px; border-radius: 3px; font-family: var(--mono); font-size: 12.5px;">$1</code>')
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  const html = DataMindMarkdown.renderMarkdown(raw);
   // Preserve the rendered tool-groups (already live DOM).
   const tools = bubble.querySelectorAll('details.tool-group');
   const marker = '<!--TOOLGROUP-->';
@@ -1174,7 +1219,8 @@ async function sendStoreInstruction(message) {
       const statuses = (receipt.results || []).map(item => `${item.surface}:${item.status}`).join(', ');
       return `revision ${receipt.revision} · ${statuses} · ${receipt.receipt_id}`;
     });
-    aiBubble.textContent = [result.answer || '写入完成。', ...receiptLines].join('\n');
+    aiBubble.dataset.raw = [result.answer || '写入完成。', ...receiptLines].join('\n');
+    renderMarkdown(aiBubble);
     await loadHealth();
     logLine(`store revision -> ${state.health?.revision ?? '?'}`);
     await loadKb();
