@@ -310,6 +310,13 @@ More architecture notes and tutorials are available in
 package lives under `datamind/`; the original v0.1 prototype remains in-tree
 for comparison.
 
+## Community & Support
+Join the DataMind community and be part of the conversation around Data-Centric AI.
+<p align="center">
+ <img width="1920" height="1080" alt="Cover Page" src="https://github.com/user-attachments/assets/3db8207b-f3b8-4013-8b1a-11aaf8d0006b" />
+</p>
+
+
 ## License
 
 DataMind is released under the [Apache License 2.0](./LICENSE).
