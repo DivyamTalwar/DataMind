@@ -73,6 +73,7 @@ _WORKSPACE_SURFACE_EXTS: dict[str, tuple[str, ...]] = {
 
 _LINEAGE_TEXT_EXTS = {".txt", ".md", ".markdown", ".html", ".json", ".xml", ".py", ".java"}
 _LINEAGE_TABLE_EXTS = {".csv", ".tsv"}
+_GRAPH_DOCUMENT_EXTS = DOCUMENT_EXTS - TABLE_EXTS
 _LINEAGE_VERSION_MARKER_RE = re.compile(
     r"[ _\-]*(v\d+|final|draft|copy|revised|updated|old|new|\(\d+\)|\d{4}[-_]\d{2}[-_]\d{2})$",
     re.IGNORECASE,
@@ -1205,17 +1206,17 @@ class IngestService:
 
         resolved = _resolve_safe_path(path, self._allowed_roots)
         if resolved.is_file():
-            if resolved.suffix.lower() not in _TEXT_EXTS:
+            if resolved.suffix.lower() not in _GRAPH_DOCUMENT_EXTS:
                 raise CapabilityError(
                     "ingest",
-                    f"unsupported extension '{resolved.suffix}'. Supported: {sorted(_TEXT_EXTS)}",
+                    f"unsupported extension '{resolved.suffix}'. Supported: {sorted(_GRAPH_DOCUMENT_EXTS)}",
                 )
             candidates = [resolved]
         elif resolved.is_dir():
             iterator = resolved.rglob("*") if recursive else resolved.glob("*")
             candidates = sorted(
                 item for item in iterator
-                if item.is_file() and item.suffix.lower() in _TEXT_EXTS
+                if item.is_file() and item.suffix.lower() in _GRAPH_DOCUMENT_EXTS
             )
         else:
             raise CapabilityError("ingest", f"path does not exist: {resolved}")
@@ -1225,19 +1226,60 @@ class IngestService:
         total = 0
         for candidate in candidates:
             try:
-                content = candidate.read_text(encoding="utf-8", errors="replace")
+                if candidate.suffix.lower() in _TEXT_EXTS:
+                    content = candidate.read_text(encoding="utf-8", errors="replace")
+                else:
+                    content = extract_document(candidate).text
                 if not content.strip():
                     skipped.append(f"{candidate}: empty")
                     continue
-                result = await self.graph_add_triples_from_text(
-                    text=content,
-                    max_triples=max_triples_per_file,
-                    source=str(candidate),
+                # A document can be much larger than the model context.  Use
+                # the same deterministic splitter as KB ingestion, but with
+                # no overlap: overlap is useful for retrieval and would make
+                # graph extraction duplicate relationships.  Each part gets
+                # a distinct reconciliation key so a later part cannot
+                # replace triples extracted from an earlier part.
+                parts = _split_text(
+                    content,
+                    chunk_size=self._chunk_size,
+                    chunk_overlap=0,
                 )
-                processed.append({"path": str(candidate), **result})
-                total += int(result.get("triples_added", 0))
-            except (OSError, UnicodeError, CapabilityError) as exc:
-                skipped.append(f"{candidate}: {exc}")
+                file_total = 0
+                part_results: list[dict[str, Any]] = []
+                for ordinal, part in enumerate(parts, 1):
+                    remaining = max_triples_per_file - file_total
+                    if remaining <= 0:
+                        break
+                    part_source = (
+                        str(candidate)
+                        if len(parts) == 1
+                        else f"{candidate}#part={ordinal}"
+                    )
+                    result = await self.graph_add_triples_from_text(
+                        text=part,
+                        max_triples=remaining,
+                        source=part_source,
+                    )
+                    part_results.append(result)
+                    file_total += int(result.get("triples_added", 0))
+                processed.append({
+                    "path": str(candidate),
+                    "source": str(candidate),
+                    "triples_added": file_total,
+                    "parts_processed": len(part_results),
+                    "parts": part_results,
+                })
+                total += file_total
+            except Exception as exc:
+                # A malformed archive, missing parser, or model-side failure
+                # should not prevent other files in the same directory from
+                # being ingested.  CancelledError inherits BaseException and
+                # therefore still propagates to the caller.
+                _log.warning(
+                    "graph_file_skipped",
+                    extra={"path": str(candidate), "error": str(exc)},
+                )
+                skipped.append(f"{candidate}: {type(exc).__name__}: {exc}")
 
         return {
             "path": str(resolved),
