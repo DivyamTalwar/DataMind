@@ -201,6 +201,34 @@ async def test_graph_add_path_rejects_unsupported_single_file(tmp_path: Path):
     with pytest.raises(CapabilityError, match="unsupported extension"):
         await service.graph_add_path(path=str(source))
 
+
+@pytest.mark.asyncio
+async def test_graph_add_path_extracts_docx_content(tmp_path: Path):
+    docx = pytest.importorskip("docx")
+    source = tmp_path / "report.docx"
+    document = docx.Document()
+    document.add_paragraph("Alice owns Project X")
+    document.save(source)
+
+    graph = _Graph()
+    service = IngestService(
+        kb=None,
+        db=None,
+        graph=graph,
+        llm_client=_Model(),
+        llm_model="test",
+        profile_data_dir=tmp_path / "profile",
+        chunk_size=512,
+        chunk_overlap=64,
+    )
+
+    result = await service.graph_add_path(path=str(source))
+
+    assert result["files_processed"] == 1
+    assert result["triples_added"] == 1
+    assert result["skipped_count"] == 0
+    assert graph.store.triples[0].source == str(source)
+
 @pytest.mark.asyncio
 async def test_raw_file_read_is_paginated_and_hashed(tmp_path: Path):
     source = tmp_path / "evidence.md"

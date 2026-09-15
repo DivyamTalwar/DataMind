@@ -73,6 +73,7 @@ _WORKSPACE_SURFACE_EXTS: dict[str, tuple[str, ...]] = {
 
 _LINEAGE_TEXT_EXTS = {".txt", ".md", ".markdown", ".html", ".json", ".xml", ".py", ".java"}
 _LINEAGE_TABLE_EXTS = {".csv", ".tsv"}
+_GRAPH_DOCUMENT_EXTS = DOCUMENT_EXTS - TABLE_EXTS
 _LINEAGE_VERSION_MARKER_RE = re.compile(
     r"[ _\-]*(v\d+|final|draft|copy|revised|updated|old|new|\(\d+\)|\d{4}[-_]\d{2}[-_]\d{2})$",
     re.IGNORECASE,
@@ -1205,17 +1206,17 @@ class IngestService:
 
         resolved = _resolve_safe_path(path, self._allowed_roots)
         if resolved.is_file():
-            if resolved.suffix.lower() not in _TEXT_EXTS:
+            if resolved.suffix.lower() not in _GRAPH_DOCUMENT_EXTS:
                 raise CapabilityError(
                     "ingest",
-                    f"unsupported extension '{resolved.suffix}'. Supported: {sorted(_TEXT_EXTS)}",
+                    f"unsupported extension '{resolved.suffix}'. Supported: {sorted(_GRAPH_DOCUMENT_EXTS)}",
                 )
             candidates = [resolved]
         elif resolved.is_dir():
             iterator = resolved.rglob("*") if recursive else resolved.glob("*")
             candidates = sorted(
                 item for item in iterator
-                if item.is_file() and item.suffix.lower() in _TEXT_EXTS
+                if item.is_file() and item.suffix.lower() in _GRAPH_DOCUMENT_EXTS
             )
         else:
             raise CapabilityError("ingest", f"path does not exist: {resolved}")
@@ -1225,7 +1226,10 @@ class IngestService:
         total = 0
         for candidate in candidates:
             try:
-                content = candidate.read_text(encoding="utf-8", errors="replace")
+                if candidate.suffix.lower() in _TEXT_EXTS:
+                    content = candidate.read_text(encoding="utf-8", errors="replace")
+                else:
+                    content = extract_document(candidate).text
                 if not content.strip():
                     skipped.append(f"{candidate}: empty")
                     continue
@@ -1236,7 +1240,7 @@ class IngestService:
                 )
                 processed.append({"path": str(candidate), **result})
                 total += int(result.get("triples_added", 0))
-            except (OSError, UnicodeError, CapabilityError) as exc:
+            except (OSError, RuntimeError, UnicodeError, CapabilityError) as exc:
                 skipped.append(f"{candidate}: {exc}")
 
         return {
