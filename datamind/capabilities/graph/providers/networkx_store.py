@@ -46,6 +46,7 @@ class NetworkXGraphStore:
         self._mutation_revision = 0
         self._state_lock = threading.RLock()
         self._persist_lock = asyncio.Lock()
+        self._persist_worker_lock = threading.Lock()
         if autoload and self._path.exists():
             self._load()
         _log.info(
@@ -84,16 +85,20 @@ class NetworkXGraphStore:
 
     async def persist(self) -> None:
         async with self._persist_lock:
+            await asyncio.to_thread(self._persist_sync)
+
+    def _persist_sync(self) -> None:
+        # Cancelling to_thread's awaiter does not stop its worker. Serialize
+        # capture, replacement, and dirty-state bookkeeping in the worker too,
+        # so a cancelled save cannot overwrite a later successful save.
+        with self._persist_worker_lock:
             with self._state_lock:
                 if not self._dirty:
                     return
                 captured_revision = self._mutation_revision
                 doc = self._document_locked()
 
-            # Only the immutable document is written in the worker thread. All
-            # graph reads and mutation bookkeeping are protected in-process,
-            # so a mutation cannot race iteration over NetworkX dictionaries.
-            await asyncio.to_thread(self._write_document, doc)
+            self._write_document(doc)
 
             with self._state_lock:
                 # A mutation may have happened while the captured document
